@@ -37,8 +37,18 @@ public class HttpChannelOverHTTP extends HttpChannel
     {
         super(connection.getHttpDestination());
         this.connection = connection;
-        this.sender = new HttpSenderOverHTTP(this);
-        this.receiver = new HttpReceiverOverHTTP(this);
+        this.sender = newHttpSender();
+        this.receiver = newHttpReceiver();
+    }
+
+    protected HttpSenderOverHTTP newHttpSender()
+    {
+        return new HttpSenderOverHTTP(this);
+    }
+
+    protected HttpReceiverOverHTTP newHttpReceiver()
+    {
+        return new HttpReceiverOverHTTP(this);
     }
 
     public HttpConnectionOverHTTP getHttpConnection()
@@ -109,9 +119,8 @@ public class HttpChannelOverHTTP extends HttpChannel
     @Override
     public String toString()
     {
-        return String.format("%s@%x(send=%s,recv=%s)",
-                getClass().getSimpleName(),
-                hashCode(),
+        return String.format("%s[send=%s,recv=%s]",
+                super.toString(),
                 sender,
                 receiver);
     }
