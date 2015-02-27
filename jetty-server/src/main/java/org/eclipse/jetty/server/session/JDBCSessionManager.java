@@ -94,10 +94,7 @@ public class JDBCSessionManager extends AbstractSessionManager
         protected boolean _dirty=false;
         
         
-        /**
-         * Time in msec since the epoch that a session cookie was set for this session
-         */
-        protected long _cookieSet;
+     
         
         
         /**
@@ -219,16 +216,7 @@ public class JDBCSessionManager extends AbstractSessionManager
             return _canonicalContext;
         }
         
-        public void setCookieSet (long ms)
-        {
-            _cookieSet = ms;
-        }
-
-        public synchronized long getCookieSet ()
-        {
-            return _cookieSet;
-        }
-
+       
         public synchronized void setLastNode (String node)
         {
             _lastNode=node;
@@ -257,11 +245,6 @@ public class JDBCSessionManager extends AbstractSessionManager
                 _dirty=true;
         }
 
-        @Override
-        protected void cookieSet()
-        {
-            _cookieSet = getAccessed();
-        }
 
         /**
          * Entry to session.
@@ -396,7 +379,7 @@ public class JDBCSessionManager extends AbstractSessionManager
         {
             return "Session rowId="+_rowId+",id="+getId()+",lastNode="+_lastNode+
                             ",created="+getCreationTime()+",accessed="+getAccessed()+
-                            ",lastAccessed="+getLastAccessedTime()+",cookieSet="+_cookieSet+
+                            ",lastAccessed="+getLastAccessedTime()+",cookieSet="+getCookieSetTime()+
                             ",maxInterval="+getMaxInactiveInterval()+",lastSaved="+_lastSaved+",expiry="+_expiryTime;
         }
     }
@@ -921,7 +904,7 @@ public class JDBCSessionManager extends AbstractSessionManager
                                                   result.getLong(_sessionTableSchema.getCreateTimeColumn()), 
                                                   result.getLong(_sessionTableSchema.getAccessTimeColumn()), 
                                                   maxInterval);
-                        session.setCookieSet(result.getLong(_sessionTableSchema.getCookieTimeColumn()));
+                        session.setCookieSetTime(result.getLong(_sessionTableSchema.getCookieTimeColumn()));
                         session.setLastAccessedTime(result.getLong(_sessionTableSchema.getLastAccessTimeColumn()));
                         session.setLastNode(result.getString(_sessionTableSchema.getLastNodeColumn()));
                         session.setLastSaved(result.getLong(_sessionTableSchema.getLastSavedTimeColumn()));
@@ -995,7 +978,7 @@ public class JDBCSessionManager extends AbstractSessionManager
             statement.setLong(6, session.getAccessed());//accessTime
             statement.setLong(7, session.getLastAccessedTime()); //lastAccessTime
             statement.setLong(8, session.getCreationTime()); //time created
-            statement.setLong(9, session.getCookieSet());//time cookie was set
+            statement.setLong(9, session.getCookieSetTime());//time cookie was set
             statement.setLong(10, now); //last saved time
             statement.setLong(11, session.getExpiryTime());
             statement.setLong(12, session.getMaxInactiveInterval());

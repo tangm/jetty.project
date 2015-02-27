@@ -154,6 +154,12 @@ public abstract class AbstractSession implements AbstractSessionManager.SessionI
     {
         return _cookieSet;
     }
+    
+    /* ------------------------------------------------------------- */
+    public void setCookieSetTime(long time)
+    {
+        _cookieSet = time;
+    }
 
     /* ------------------------------------------------------------- */
     @Override
