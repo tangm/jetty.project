@@ -401,9 +401,10 @@ public class InfinispanSessionManager extends AbstractSessionManager
                 LOG.debug("Access session({}) for context {} on worker {}", getId(), getContextPath(), getSessionIdManager().getWorkerName());
             try
             {
-                _lock.lock();
 
                 long now = System.currentTimeMillis();
+                _lock.lock();
+
                 //if the first thread, check that the session in memory is not stale, if we're checking for stale sessions
                 if (getStaleIntervalSec() > 0  && (now - getLastSyncTime()) >= (getStaleIntervalSec() * 1000L))
                 {
@@ -1024,7 +1025,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
             throw new IllegalStateException("No cache");
         
         if (LOG.isDebugEnabled()) LOG.debug("Loading session {} from cluster", key);
-        //SerializableSession storableSession = (SerializableSession)_cache.get(key);
+
         SerializableSessionData storableSession = (SerializableSessionData)_cache.get(key);
         if (storableSession == null)
         {
@@ -1033,7 +1034,6 @@ public class InfinispanSessionManager extends AbstractSessionManager
         }
         else
         {
-            //Session session = storableSession.getSession();
             Session session = new Session (storableSession);
             session.setLastSyncTime(System.currentTimeMillis());
             return session;
