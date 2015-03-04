@@ -42,6 +42,8 @@ import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.eclipse.jetty.util.thread.Scheduler;
 import org.infinispan.Cache;
+import org.infinispan.commons.api.BasicCache;
+import org.omg.CORBA._IDLTypeStub;
 
 /**
  * InfinispanSessionManager
@@ -73,7 +75,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
     /**
      * Clustered cache of sessions
      */
-    private Cache<String, Object> _cache;
+    private BasicCache<String, Object> _cache;
     
     
     /**
@@ -197,7 +199,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
             lastNode = in.readUTF(); //last managing node
             expiry = in.readLong(); 
             maxInactive = in.readLong();
-            HashMap<String,Object> attributes = (HashMap<String,Object>)in.readObject();
+            attributes = (HashMap<String,Object>)in.readObject();
         }
         
     }
@@ -317,11 +319,6 @@ public class InfinispanSessionManager extends AbstractSessionManager
         private String _contextPath;
         
         
-        /**
-         * The number of currently active request threads in this session
-         */
-        private AtomicInteger _activeThreads = new AtomicInteger(0);
-        
         
         /**
          * The time in msec since the epoch at which this session should expire
@@ -404,20 +401,15 @@ public class InfinispanSessionManager extends AbstractSessionManager
                 LOG.debug("Access session({}) for context {} on worker {}", getId(), getContextPath(), getSessionIdManager().getWorkerName());
             try
             {
-               _lock.lock();
+                _lock.lock();
 
-                //a request thread is entering
-                if (_activeThreads.incrementAndGet() == 1)
+                long now = System.currentTimeMillis();
+                //if the first thread, check that the session in memory is not stale, if we're checking for stale sessions
+                if (getStaleIntervalSec() > 0  && (now - getLastSyncTime()) >= (getStaleIntervalSec() * 1000L))
                 {
-                    long now = System.currentTimeMillis();
-                    
-                    //if the first thread, check that the session in memory is not stale, if we're checking for stale sessions
-                    if (getStaleIntervalSec() > 0  && (now - getLastSyncTime()) >= (getStaleIntervalSec() * 1000L))
-                    {
-                        if (LOG.isDebugEnabled())
-                            LOG.debug("Acess session({}) for context {} on worker {} stale session. Reloading.", getId(), getContextPath(), getSessionIdManager().getWorkerName());
-                        refresh();
-                    }
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("Acess session({}) for context {} on worker {} stale session. Reloading.", getId(), getContextPath(), getSessionIdManager().getWorkerName());
+                    refresh();
                 }
             }
             catch (Exception e)
@@ -448,28 +440,32 @@ public class InfinispanSessionManager extends AbstractSessionManager
         {
             super.complete();
 
-            //if this is the last request thread to be in the session
-            if (_activeThreads.decrementAndGet() == 0)
+            try
             {
-                try
+                //an invalid session will already have been removed from the
+                //local session map and deleted from the cluster. If its valid save
+                //it to the cluster.
+                //TODO consider doing only periodic saves if only the last access
+                //time to the session changes
+                if (isValid())
                 {
-                    //an invalid session will already have been removed from the
-                    //local session map and deleted from the cluster. If its valid save
-                    //it to the cluster.
-                    //TODO consider doing only periodic saves if only the last access
-                    //time to the session changes
-                    if (isValid())
+                    willPassivate();
+                    try
                     {
-                        willPassivate();
+                        _lock.lock();
                         save(this);
-                        didActivate();
                     }
+                    finally
+                    {
+                        _lock.unlock();
+                    }
+                    didActivate();
                 }
-                catch (Exception e)
-                {
-                    LOG.warn("Problem saving session({})",getId(), e);
-                }
-            }  
+            }
+            catch (Exception e)
+            {
+                LOG.warn("Problem saving session({})",getId(), e);
+            } 
         }
 
         /** 
@@ -494,8 +490,8 @@ public class InfinispanSessionManager extends AbstractSessionManager
         private void refresh ()
         {
             //get fresh copy from the cluster
-            Session fresh = load(getId());
-            
+            Session fresh = load(makeKey(getClusterId(), _context));
+
             //if the session no longer exists, invalidate
             if (fresh == null)
             {
@@ -709,7 +705,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
                     candidateIds.add(entry.getKey());
             }
         }
-        
+
         for (String candidateId:candidateIds)
         {
             if (LOG.isDebugEnabled())
@@ -803,7 +799,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
      * 
      * @return
      */
-    public Cache<String, Object> getCache() 
+    public BasicCache<String, Object> getCache() 
     {
         return _cache;
     }
@@ -815,7 +811,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
      * 
      * @param cache
      */
-    public void setCache (Cache<String, Object> cache) 
+    public void setCache (BasicCache<String, Object> cache) 
     {
         this._cache = cache;
     }
@@ -873,7 +869,6 @@ public class InfinispanSessionManager extends AbstractSessionManager
     {
         Session session = null;
 
-        
         //try and find the session in this node's memory
         Session memSession = (Session)_sessions.get(idInCluster);
 
@@ -940,7 +935,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
         }
         catch (Exception e)
         {
-            LOG.warn("Unable to load session {}", idInCluster, e);
+            LOG.warn("Unable to load session="+idInCluster, e);
             return null;
         }
     }
@@ -1074,7 +1069,7 @@ public class InfinispanSessionManager extends AbstractSessionManager
      * @param session
      */
     protected void delete (InfinispanSessionManager.Session session)
-    {
+    {  
         if (_cache == null)
             throw new IllegalStateException("No cache");
         if (LOG.isDebugEnabled()) LOG.debug("Removing session {} from cluster", session.getId());

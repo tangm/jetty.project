@@ -32,7 +32,8 @@ import org.eclipse.jetty.server.session.AbstractSessionIdManager;
 import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
-import org.infinispan.Cache;
+import org.infinispan.commons.api.BasicCache;
+
 
 
 
@@ -61,7 +62,7 @@ public class InfinispanSessionIdManager extends AbstractSessionIdManager
 {
     private  final static Logger LOG = Log.getLogger("org.eclipse.jetty.server.session");
     protected final static String ID_KEY = "__o.e.j.s.infinispanIdMgr__";
-    protected Cache<String,Object> _cache;
+    protected BasicCache<String,Object> _cache;
     private Server _server;
 
     
@@ -245,12 +246,12 @@ public class InfinispanSessionIdManager extends AbstractSessionIdManager
 
     }
 
-    public Cache<String,Object> getCache() 
+    public BasicCache<String,Object> getCache() 
     {
         return _cache;
     }
 
-    public void setCache(Cache<String,Object> cache) 
+    public void setCache(BasicCache<String,Object> cache) 
     {
         this._cache = cache;
     }
