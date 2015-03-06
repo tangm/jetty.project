@@ -76,14 +76,34 @@ public class InfinispanTestSessionServer extends AbstractTestServer
         return new SessionHandler(sessionManager);
     }
 
+    public boolean exists (String id)
+    {
+        BasicCache cache = ((InfinispanSessionIdManager)_sessionIdManager).getCache();
+        if (cache != null)
+        {
+            return cache.containsKey(id);      
+        }
+        
+        return false;
+    }
+    
+    public Object get (String id)
+    {
+        BasicCache cache = ((InfinispanSessionIdManager)_sessionIdManager).getCache();
+        if (cache != null)
+        {
+            return cache.get(id);      
+        }
+        
+        return null;
+    }
 
     public void dumpCache ()
     {
         BasicCache cache = ((InfinispanSessionIdManager)_sessionIdManager).getCache();
         if (cache != null)
         {
-            System.err.println(cache.getName()+" contains "+cache.size()+" entries");
-            
+            System.err.println(cache.getName()+" contains "+cache.size()+" entries");         
         }
     }
 

@@ -42,7 +42,7 @@ import org.junit.Test;
 
 
 /**
- * AbstractLightLoadTest
+ * AbstractScatterGunLoadTest
  * 
  * This is an unrealistic test. It takes a scatter-gun approach to smearing a
  * single session across 2 different nodes at once. 
@@ -50,7 +50,7 @@ import org.junit.Test;
  * In the real world, we must have a load balancer that uses sticky sessions
  * to keep the session pinned to a particular node.
  */
-public abstract class AbstractLightLoadTest
+public abstract class AbstractScatterGunLoadTest
 {
     protected boolean _stress = Boolean.getBoolean( "STRESS" );
 
