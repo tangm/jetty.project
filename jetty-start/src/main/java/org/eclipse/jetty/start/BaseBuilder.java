@@ -251,12 +251,21 @@ public class BaseBuilder
     {
         if (startArgs.isDownload() && (arg.uri != null))
         {
+            // now on copy/download paths (be safe above all else)
+            if (!file.startsWith(baseHome.getBasePath()))
+            {
+                throw new IOException("For security reasons, Jetty start is unable to process maven file resource not in ${jetty.base} - " + file);
+            }
+            
+            // make the directories in ${jetty.base} that we need
+            FS.ensureDirectoryExists(file.getParent());
+            
             URI uri = URI.create(arg.uri);
 
             // Process via initializers
             for (FileInitializer finit : fileInitializers)
             {
-                if (finit.init(uri,file))
+                if (finit.init(uri,file,arg.location))
                 {
                     // Completed successfully
                     return true;
