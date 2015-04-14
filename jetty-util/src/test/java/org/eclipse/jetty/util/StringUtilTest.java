@@ -40,7 +40,6 @@ public class StringUtilTest
     @Test
     public void testStartsWithIgnoreCase()
     {
-
         assertTrue(StringUtil.startsWithIgnoreCase("\u0690b\u0690defg", "\u0690b\u0690"));
         assertTrue(StringUtil.startsWithIgnoreCase("\u0690bcdefg", "\u0690bc"));
         assertTrue(StringUtil.startsWithIgnoreCase("\u0690bcdefg", "\u0690Bc"));
@@ -201,7 +200,8 @@ public class StringUtilTest
     }
 
     @Test
-    public void testIsBlank() {
+    public void testIsBlank() 
+    {
         Assert.assertTrue(StringUtil.isBlank(null));
         Assert.assertTrue(StringUtil.isBlank(""));
         Assert.assertTrue(StringUtil.isBlank("\r\n"));
@@ -216,7 +216,8 @@ public class StringUtilTest
     }
 
     @Test
-    public void testIsNotBlank() {
+    public void testIsNotBlank() 
+    {
         Assert.assertFalse(StringUtil.isNotBlank(null));
         Assert.assertFalse(StringUtil.isNotBlank(""));
         Assert.assertFalse(StringUtil.isNotBlank("\r\n"));
@@ -228,5 +229,42 @@ public class StringUtilTest
         Assert.assertTrue(StringUtil.isNotBlank("a  "));
         Assert.assertTrue(StringUtil.isNotBlank("."));
         Assert.assertTrue(StringUtil.isNotBlank(";\n"));
+    }
+    
+    @Test
+    public void testSplit()
+    {
+        String[] array;
+        
+        array=StringUtil.split(null);
+        Assert.assertNull(array);
+        
+        array=StringUtil.split("");
+        Assert.assertEquals(0,array.length);
+        
+        array=StringUtil.split("    ");
+        Assert.assertEquals(0,array.length);
+
+        array=StringUtil.split(",");
+        Assert.assertEquals(0,array.length);
+        
+        array=StringUtil.split("foo");
+        Assert.assertEquals(1,array.length);
+        Assert.assertEquals("foo",array[0]);
+        
+        array=StringUtil.split("foo,bar");
+        Assert.assertEquals(2,array.length);
+        Assert.assertEquals("foo",array[0]);
+        Assert.assertEquals("bar",array[1]);
+        
+        array=StringUtil.split("foo,bar,");
+        Assert.assertEquals(2,array.length);
+        Assert.assertEquals("foo",array[0]);
+        Assert.assertEquals("bar",array[1]);
+        
+        array=StringUtil.split(" foo ,   bar   ,   ");
+        Assert.assertEquals(2,array.length);
+        Assert.assertEquals("foo",array[0]);
+        Assert.assertEquals("bar",array[1]);
     }
 }

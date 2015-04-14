@@ -42,12 +42,17 @@ import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.types.FileSet;
 import org.eclipse.jetty.annotations.AnnotationConfiguration;
+import org.eclipse.jetty.annotations.AnnotationFeature;
 import org.eclipse.jetty.ant.types.Attribute;
 import org.eclipse.jetty.ant.types.Attributes;
 import org.eclipse.jetty.ant.types.FileMatchingConfiguration;
 import org.eclipse.jetty.ant.utils.TaskLog;
+import org.eclipse.jetty.plus.jndi.JndiFeature;
 import org.eclipse.jetty.plus.webapp.EnvConfiguration;
 import org.eclipse.jetty.plus.webapp.PlusConfiguration;
+import org.eclipse.jetty.plus.webapp.PlusFeature;
+import org.eclipse.jetty.server.Feature;
+import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.FilterMapping;
 import org.eclipse.jetty.servlet.Holder;
@@ -63,6 +68,7 @@ import org.eclipse.jetty.webapp.JettyWebXmlConfiguration;
 import org.eclipse.jetty.webapp.MetaInfConfiguration;
 import org.eclipse.jetty.webapp.WebAppClassLoader;
 import org.eclipse.jetty.webapp.WebAppContext;
+import org.eclipse.jetty.webapp.WebAppFeature;
 import org.eclipse.jetty.webapp.WebInfConfiguration;
 import org.eclipse.jetty.webapp.WebXmlConfiguration;
 import org.eclipse.jetty.xml.XmlConfiguration;
@@ -78,29 +84,6 @@ import org.eclipse.jetty.xml.XmlConfiguration;
 public class AntWebAppContext extends WebAppContext
 {
     private static final Logger LOG = Log.getLogger(WebAppContext.class);
-    
-    public final AntWebInfConfiguration antWebInfConfiguration = new AntWebInfConfiguration();
-    public final WebXmlConfiguration webXmlConfiguration = new WebXmlConfiguration();
-    public final MetaInfConfiguration metaInfConfiguration = new MetaInfConfiguration();
-    public final FragmentConfiguration fragmentConfiguration = new FragmentConfiguration();
-    public final EnvConfiguration envConfiguration = new EnvConfiguration();
-    public final PlusConfiguration plusConfiguration = new PlusConfiguration();
-    public final AnnotationConfiguration annotationConfiguration = new AnnotationConfiguration();
-    public final JettyWebXmlConfiguration jettyWebXmlConfiguration = new JettyWebXmlConfiguration();
-
-
-    public final Configuration[] DEFAULT_CONFIGURATIONS = 
-        { 
-         antWebInfConfiguration,
-         webXmlConfiguration,
-         metaInfConfiguration,
-         fragmentConfiguration,
-         envConfiguration,
-         plusConfiguration,
-         annotationConfiguration,
-         jettyWebXmlConfiguration
-        };
-    
 
     public final static String DEFAULT_CONTAINER_INCLUDE_JAR_PATTERN =
     ".*/.*jsp-api-[^/]*\\.jar$|.*/.*jsp-[^/]*\\.jar$|.*/.*taglibs[^/]*\\.jar$|.*/.*jstl[^/]*\\.jar$|.*/.*jsf-impl-[^/]*\\.jar$|.*/.*javax.faces-[^/]*\\.jar$|.*/.*myfaces-impl-[^/]*\\.jar$";
@@ -437,7 +420,21 @@ public class AntWebAppContext extends WebAppContext
     {
         super();
         this.project = project;
-        setConfigurations(DEFAULT_CONFIGURATIONS);
+        addBean(new PlusFeature());
+        addBean(new JndiFeature());
+        addBean(new AnnotationFeature());
+        addBean(new WebAppFeature(AntWebAppContext.class.getPackage().getName())
+        {
+            @Override
+            protected boolean doPreEnableWebApp(WebAppContext webapp)
+            {
+                super.doPreEnableWebApp(webapp);
+                webapp.removeConfiguration(WebInfConfiguration.class);
+                webapp.getConfigurations().add(0,new AntWebInfConfiguration());
+                return true;
+            }
+            
+        });
         setAttribute(WebInfConfiguration.CONTAINER_JAR_PATTERN, DEFAULT_CONTAINER_INCLUDE_JAR_PATTERN);
         setParentLoaderPriority(true);
     }
@@ -637,7 +634,7 @@ public class AntWebAppContext extends WebAppContext
         {
             TaskLog.logWithTimestamp("Starting web application "+this.getDescriptor());
             if (jettyEnvXml != null && jettyEnvXml.exists())
-                envConfiguration.setJettyEnvXml(Resource.toURL(jettyEnvXml));
+                getConfiguraton(EnvConfiguration.class).setJettyEnvXmlUri(jettyEnvXml.toURI().toString());
             
             ClassLoader parentLoader = this.getClass().getClassLoader();
             if (parentLoader instanceof AntClassLoader)
@@ -665,6 +662,7 @@ public class AntWebAppContext extends WebAppContext
             TaskLog.log(e.toString());
         }
     }
+
 
     public void doStop()
     {

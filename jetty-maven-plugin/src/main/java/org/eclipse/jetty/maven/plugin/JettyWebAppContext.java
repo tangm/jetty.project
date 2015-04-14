@@ -33,8 +33,10 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import org.eclipse.jetty.annotations.AnnotationConfiguration;
+import org.eclipse.jetty.plus.jndi.JndiFeature;
 import org.eclipse.jetty.plus.webapp.EnvConfiguration;
 import org.eclipse.jetty.plus.webapp.PlusConfiguration;
+import org.eclipse.jetty.plus.webapp.PlusFeature;
 import org.eclipse.jetty.quickstart.PreconfigureDescriptorProcessor;
 import org.eclipse.jetty.quickstart.QuickStartDescriptorGenerator;
 import org.eclipse.jetty.servlet.FilterHolder;
@@ -73,6 +75,8 @@ public class JettyWebAppContext extends WebAppContext
     private static final String WEB_INF_CLASSES_PREFIX = "/WEB-INF/classes";
     private static final String WEB_INF_LIB_PREFIX = "/WEB-INF/lib";
 
+    
+    // TODO use features????
     private final Configuration[] _defaultConfigurations = {
                                                              new MavenWebInfConfiguration(),
                                                              new WebXmlConfiguration(),
@@ -302,26 +306,26 @@ public class JettyWebAppContext extends WebAppContext
     @Override
     public void doStart () throws Exception
     {
+        addBean(new PlusFeature());
+        addBean(new JndiFeature(getJettyEnvXml()));
+        
         //choose if this will be a quickstart or normal start
         if (!isGenerateQuickStart() && getQuickStartWebDescriptor() != null)
-            setConfigurations(_quickStartConfigurations);
+            setConfigurationsAsArray(_quickStartConfigurations);
         else
         {
-            setConfigurations(_defaultConfigurations);
+            setConfigurationsAsArray(_defaultConfigurations);
             if (isGenerateQuickStart())
             {
                 _preconfigProcessor = new PreconfigureDescriptorProcessor();
                 getMetaData().addDescriptorProcessor(_preconfigProcessor);
             }
         }
-        
 
         //inject configurations with config from maven plugin    
         for (Configuration c:getConfigurations())
         {
-            if (c instanceof EnvConfiguration && getJettyEnvXml() != null)
-                ((EnvConfiguration)c).setJettyEnvXml(Resource.toURL(new File(getJettyEnvXml())));
-            else if (c instanceof MavenQuickStartConfiguration && getQuickStartWebDescriptor() != null)
+            if (c instanceof MavenQuickStartConfiguration && getQuickStartWebDescriptor() != null)
                 ((MavenQuickStartConfiguration)c).setQuickStartWebXml(getQuickStartWebDescriptor());         
         }
 

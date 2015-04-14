@@ -45,7 +45,7 @@ import org.eclipse.jetty.websocket.common.extensions.ExtensionStack;
 import org.eclipse.jetty.websocket.common.extensions.compress.DeflateFrameExtension;
 import org.eclipse.jetty.websocket.jsr356.JsrExtension;
 import org.eclipse.jetty.websocket.jsr356.JsrSession;
-import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketServerContainerInitializer;
+import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketFeature;
 import org.eclipse.jetty.websocket.jsr356.server.samples.echo.BasicEchoEndpoint;
 import org.eclipse.jetty.websocket.server.WebSocketUpgradeFilter;
 import org.junit.After;
@@ -69,7 +69,7 @@ public class ExtensionStackProcessingTest
         server.addConnector(connector);
 
         ServletContextHandler context = new ServletContextHandler(server, "/", true, false);
-        ServerContainer container = WebSocketServerContainerInitializer.configureContext(context);
+        ServerContainer container = WebSocketFeature.configureContext(context);
         
         WebSocketUpgradeFilter filter = (WebSocketUpgradeFilter)context.getAttribute(WebSocketUpgradeFilter.class.getName());
         serverExtensionFactory = filter.getFactory().getExtensionFactory();

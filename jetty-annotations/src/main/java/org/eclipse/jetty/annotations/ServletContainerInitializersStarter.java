@@ -21,11 +21,11 @@ package org.eclipse.jetty.annotations;
 import java.util.List;
 
 import org.eclipse.jetty.plus.annotation.ContainerInitializer;
+import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
-import org.eclipse.jetty.webapp.WebAppContext;
 
 
 /**
@@ -37,12 +37,12 @@ import org.eclipse.jetty.webapp.WebAppContext;
 public class ServletContainerInitializersStarter extends AbstractLifeCycle implements ServletContextHandler.ServletContainerInitializerCaller
 {
     private static final Logger LOG = Log.getLogger(ServletContainerInitializersStarter.class);
-    WebAppContext _context;
+    ContextHandler _context;
     
     /**
      * @param context
      */
-    public ServletContainerInitializersStarter(WebAppContext context)
+    public ServletContainerInitializersStarter(ContextHandler context)
     {
         _context = context;
     }
@@ -72,6 +72,4 @@ public class ServletContainerInitializersStarter extends AbstractLifeCycle imple
             }
         }
     }
-    
-    
 }

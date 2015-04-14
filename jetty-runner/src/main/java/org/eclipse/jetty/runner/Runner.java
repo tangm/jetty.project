@@ -68,6 +68,7 @@ public class Runner
 {
     private static final Logger LOG = Log.getLogger(Runner.class);
 
+    // TODO use features
     public static final String[] __plusConfigurationClasses = new String[] {
             org.eclipse.jetty.webapp.WebInfConfiguration.class.getCanonicalName(),
             org.eclipse.jetty.webapp.WebXmlConfiguration.class.getCanonicalName(),

@@ -68,6 +68,7 @@ import org.eclipse.jetty.http.HttpURI;
 import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.ClassLoaderDump;
 import org.eclipse.jetty.server.Connector;
+import org.eclipse.jetty.server.Feature;
 import org.eclipse.jetty.server.Dispatcher;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HandlerContainer;
@@ -81,6 +82,7 @@ import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.URIUtil;
 import org.eclipse.jetty.util.annotation.ManagedAttribute;
 import org.eclipse.jetty.util.annotation.ManagedObject;
+import org.eclipse.jetty.util.component.DumpableCollection;
 import org.eclipse.jetty.util.component.Graceful;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
@@ -185,7 +187,8 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     private final List<EventListener> _durableListeners = new CopyOnWriteArrayList<>();
     private Map<String, Object> _managedAttributes;
     private String[] _protectedTargets;
-    private final CopyOnWriteArrayList<AliasCheck> _aliasChecks = new CopyOnWriteArrayList<ContextHandler.AliasCheck>();
+    private final List<AliasCheck> _aliasChecks = new CopyOnWriteArrayList<ContextHandler.AliasCheck>();
+    private final Map<String,Feature> _features = new HashMap<>();
 
     public enum Availability { UNAVAILABLE,STARTING,AVAILABLE,SHUTDOWN,};
     private volatile Availability _availability;
@@ -243,10 +246,12 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     public void dump(Appendable out, String indent) throws IOException
     {
         dumpBeans(out,indent,
-            Collections.singletonList(new ClassLoaderDump(getClassLoader())),
-            _initParams.entrySet(),
-            _attributes.getAttributeEntrySet(),
-            _scontext.getAttributeEntrySet());
+                Collections.singletonList(new ClassLoaderDump(getClassLoader())),
+                Collections.singletonList(new DumpableCollection("Features "+this,getFeatures())),
+                Collections.singletonList(new DumpableCollection("Handler attributes "+this,((AttributesMap)getAttributes()).getAttributeEntrySet())),
+                Collections.singletonList(new DumpableCollection("Context attributes "+this,((Context)getServletContext()).getAttributeEntrySet())),
+                Collections.singletonList(new DumpableCollection("Initparams "+this,getInitParams().entrySet()))
+                );
     }
 
     /* ------------------------------------------------------------ */
@@ -705,12 +710,52 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     }
 
     /* ------------------------------------------------------------ */
+    protected void preConfigure() throws Exception
+    {
+    }
+
+    /* ------------------------------------------------------------ */
+    protected void configure() throws Exception
+    {
+    }
+
+    /* ------------------------------------------------------------ */
+    protected void postConfigure() throws Exception
+    {
+    }
+    
+    /* ------------------------------------------------------------ */
     /*
      * @see org.eclipse.thread.AbstractLifeCycle#doStart()
      */
     @Override
     protected void doStart() throws Exception
     {
+        // Setup the features
+        _features.clear();
+        for (Feature feature: getBeans(Feature.class))
+        {
+            if (_features.containsKey(feature.getKey()))
+                continue;
+            if (feature.preEnable(this))
+            {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("enabled {} in {}",feature,this);
+                _features.put(feature.getKey(),feature);
+            }
+        }
+        for (Feature feature: getServer().getBeans(Feature.class))
+        {
+            if (_features.containsKey(feature.getKey()))
+                continue;
+            if (feature.preEnable(this))
+            {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("enabled {} from server in {}",feature,this);
+                _features.put(feature.getKey(),feature);
+            }
+        }
+        
         _availability = Availability.STARTING;
 
         if (_contextPath == null)
@@ -725,6 +770,8 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         
         try
         {
+            preConfigure();
+            
             // Set the classloader
             if (_classLoader != null)
             {
@@ -739,11 +786,15 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             old_context = __context.get();
             __context.set(_scontext);
 
+            // Configure
+            configure();
+            
             // defers the calling of super.doStart()
             startContext();
-
             _availability = Availability.AVAILABLE;
             LOG.info("Started {}", this);
+
+            postConfigure();
         }
         finally
         {
@@ -754,7 +805,19 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
                 current_thread.setContextClassLoader(old_classloader);
         }
     }
+    
+    /* ------------------------------------------------------------ */
+    public Feature getFeature(String key)
+    {
+        return _features.get(key);
+    }
 
+    /* ------------------------------------------------------------ */
+    public Set<String> getFeatures()
+    {
+        return _features.keySet();
+    }
+    
     /* ------------------------------------------------------------ */
     /**
      * Extensible startContext. this method is called from {@link ContextHandler#doStart()} instead of a call to super.doStart(). This allows derived classes to
@@ -784,6 +847,24 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         }
 
         super.doStart();
+        
+        // start features 
+        for (Iterator<Feature> f=_features.values().iterator(); f.hasNext(); )
+        {
+            Feature feature = f.next();
+        
+            if (feature.enable(this))
+            {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("started {} in {}",feature,this);
+            }
+            else
+            {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("!started {} in {}",feature,this);
+                f.remove();
+            }
+        }
 
         // Call context listeners
         if (!_contextListeners.isEmpty())
@@ -861,6 +942,9 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             for (EventListener l : _programmaticListeners)
                 removeEventListener(l);
             _programmaticListeners.clear();
+
+            // remove features
+            _features.clear();
         }
         finally
         {
@@ -1488,7 +1572,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     {
         if (errorHandler != null)
             errorHandler.setServer(getServer());
-        updateBean(_errorHandler,errorHandler);
+        updateBean(_errorHandler,errorHandler,true);
         _errorHandler = errorHandler;
     }
 

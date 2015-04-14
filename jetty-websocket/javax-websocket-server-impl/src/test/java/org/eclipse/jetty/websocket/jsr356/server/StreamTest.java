@@ -64,7 +64,7 @@ import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.websocket.common.test.LeakTrackingBufferPoolRule;
 import org.eclipse.jetty.websocket.common.util.Hex;
-import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketServerContainerInitializer;
+import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketFeature;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -94,7 +94,7 @@ public class StreamTest
         context.setContextPath("/");
         server.setHandler(context);
 
-        ServerContainer wsContainer = WebSocketServerContainerInitializer.configureContext(context);
+        ServerContainer wsContainer = WebSocketFeature.configureContext(context);
 
         // Prepare Server Side Output directory for uploaded files
         outputDir = MavenTestingUtils.getTargetTestingDir(StreamTest.class.getName());

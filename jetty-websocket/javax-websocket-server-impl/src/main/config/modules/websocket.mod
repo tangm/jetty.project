@@ -9,4 +9,6 @@ annotations
 [lib]
 lib/websocket/*.jar
 
+[xml]
+etc/jetty-websocket.xml
 

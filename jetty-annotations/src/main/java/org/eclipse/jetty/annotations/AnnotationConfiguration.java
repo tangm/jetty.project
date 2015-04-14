@@ -713,8 +713,8 @@ public class AnnotationConfiguration extends AbstractConfiguration
             initializers.add(initializer);
         }
         
-        
-        //add a bean to the context which will call the servletcontainerinitializers when appropriate
+        // add a bean to the context which will call the servletcontainerinitializers when appropriate:
+        // after configuration, after starting servlet handlers, but before any listeners are called.
         ServletContainerInitializersStarter starter = (ServletContainerInitializersStarter)context.getAttribute(CONTAINER_INITIALIZER_STARTER);
         if (starter != null)
             throw new IllegalStateException("ServletContainerInitializersStarter already exists");

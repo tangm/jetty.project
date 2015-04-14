@@ -30,6 +30,7 @@ import java.net.URL;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 
+import org.eclipse.jetty.plus.jndi.JndiFeature;
 import org.eclipse.jetty.webapp.Descriptor;
 import org.eclipse.jetty.webapp.FragmentDescriptor;
 import org.eclipse.jetty.webapp.Origin;
@@ -61,6 +62,9 @@ public class PlusDescriptorProcessorTest
     {
         context = new WebAppContext();
         context.setClassLoader(new WebAppClassLoader(Thread.currentThread().getContextClassLoader(), context));
+
+        new JndiFeature().preEnable(context);
+        
         ClassLoader oldLoader = Thread.currentThread().getContextClassLoader();
         Thread.currentThread().setContextClassLoader(context.getClassLoader());
         Context icontext = new InitialContext();

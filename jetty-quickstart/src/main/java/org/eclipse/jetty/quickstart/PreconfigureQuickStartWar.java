@@ -18,11 +18,15 @@
 
 package org.eclipse.jetty.quickstart;
 
+import org.eclipse.jetty.annotations.AnnotationFeature;
+import org.eclipse.jetty.plus.jndi.JndiFeature;
+import org.eclipse.jetty.plus.webapp.PlusFeature;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.resource.JarResource;
 import org.eclipse.jetty.util.resource.Resource;
+import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketFeature;
 import org.eclipse.jetty.xml.XmlConfiguration;
 
 public class PreconfigureQuickStartWar
@@ -72,7 +76,6 @@ public class PreconfigureQuickStartWar
                 break;
         }
 
-        
         preconfigure(war,dir,xml);
     }
 
@@ -96,6 +99,10 @@ public class PreconfigureQuickStartWar
         }
         
         final Server server = new Server();
+        server.addBean(new WebSocketFeature());
+        server.addBean(new JndiFeature());
+        server.addBean(new PlusFeature());
+        server.addBean(new AnnotationFeature());
 
         QuickStartWebApp webapp = new QuickStartWebApp();
 
@@ -112,8 +119,6 @@ public class PreconfigureQuickStartWar
         server.start();
         server.stop();
     }
-    
-    
     
 
     private static void error(String message)

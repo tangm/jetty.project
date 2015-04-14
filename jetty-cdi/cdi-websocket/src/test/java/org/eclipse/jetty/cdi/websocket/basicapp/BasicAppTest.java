@@ -39,7 +39,7 @@ import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.websocket.api.StatusCode;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
-import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketServerContainerInitializer;
+import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketFeature;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -72,7 +72,7 @@ public class BasicAppTest
         server.setHandler(context);
         
         // Add some websockets
-        ServerContainer container = WebSocketServerContainerInitializer.configureContext(context);
+        ServerContainer container = WebSocketFeature.configureContext(context);
         container.addEndpoint(EchoSocket.class);
         container.addEndpoint(InfoSocket.class);
 

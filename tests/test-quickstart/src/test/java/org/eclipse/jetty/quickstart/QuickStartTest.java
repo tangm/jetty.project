@@ -25,11 +25,14 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import org.eclipse.jetty.plus.jndi.JndiFeature;
+import org.eclipse.jetty.plus.webapp.PlusFeature;
 import org.eclipse.jetty.server.NetworkConnector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.IO;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.webapp.WebDescriptor;
+import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketFeature;
 import org.eclipse.jetty.xml.XmlConfiguration;
 import org.eclipse.jetty.xml.XmlParser.Node;
 import org.hamcrest.Matchers;
@@ -58,11 +61,15 @@ public class QuickStartTest
         Resource contextXml = Resource.newResource("src/test/resources/test.xml");
         
         Server server = new Server(0);
+        server.addBean(new WebSocketFeature());
+        server.addBean(new JndiFeature());
+        server.addBean(new PlusFeature());
         
         QuickStartWebApp webapp = new QuickStartWebApp();
         webapp.setAutoPreconfigure(true);
         webapp.setWar(war);
         webapp.setContextPath("/");
+        
 
         //apply context xml file
         if (contextXml != null)
@@ -104,6 +111,9 @@ public class QuickStartTest
         Resource contextXml = Resource.newResource("src/test/resources/test-spec.xml");
         
         Server server = new Server(0);
+        server.addBean(new WebSocketFeature());
+        server.addBean(new JndiFeature());
+        server.addBean(new PlusFeature());
         
         QuickStartWebApp webapp = new QuickStartWebApp();
         webapp.setAutoPreconfigure(true);
@@ -150,6 +160,9 @@ public class QuickStartTest
         Resource contextXml = Resource.newResource("src/test/resources/test-jndi.xml");
         
         Server server = new Server(0);
+        server.addBean(new WebSocketFeature());
+        server.addBean(new JndiFeature());
+        server.addBean(new PlusFeature());
         
         QuickStartWebApp webapp = new QuickStartWebApp();
         webapp.setAutoPreconfigure(true);

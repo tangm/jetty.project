@@ -48,7 +48,6 @@ public class TestAnnotationConfiguration
         Resource jar1 = Resource.newResource(url+"file.jar");
 
         AnnotationConfiguration config = new AnnotationConfiguration();
-        WebAppContext wac = new WebAppContext();
 
         List<FragmentDescriptor> frags = new ArrayList<FragmentDescriptor>();
         frags.add(new FragmentDescriptor(Resource.newResource("jar:"+url+"file.jar!/fooa.props")));

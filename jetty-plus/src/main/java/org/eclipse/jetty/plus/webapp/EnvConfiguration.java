@@ -54,11 +54,26 @@ public class EnvConfiguration extends AbstractConfiguration
     private static final Logger LOG = Log.getLogger(EnvConfiguration.class);
 
     private static final String JETTY_ENV_BINDINGS = "org.eclipse.jetty.jndi.EnvConfiguration";
-    private URL jettyEnvXmlUrl;
+    private String jettyEnvXmlUri;
 
-    public void setJettyEnvXml (URL url)
+    public EnvConfiguration()
     {
-        this.jettyEnvXmlUrl = url;
+        this(null);
+    }
+
+    public EnvConfiguration(String jettyEnvXmlUri)
+    {
+        this.jettyEnvXmlUri = jettyEnvXmlUri;
+    }
+    
+    public String getJettyEnvXmlUri()
+    {
+        return jettyEnvXmlUri;
+    }
+
+    public void setJettyEnvXmlUri(String jettyEnvXmlUri)
+    {
+        this.jettyEnvXmlUri = jettyEnvXmlUri;
     }
 
     /**
@@ -81,9 +96,11 @@ public class EnvConfiguration extends AbstractConfiguration
         if (LOG.isDebugEnabled())
             LOG.debug("Created java:comp/env for webapp "+context.getContextPath());
 
+        URL url = jettyEnvXmlUri==null?null:new URL(jettyEnvXmlUri);
+        
         //check to see if an explicit file has been set, if not,
         //look in WEB-INF/jetty-env.xml
-        if (jettyEnvXmlUrl == null)
+        if (url == null)
         {
             //look for a file called WEB-INF/jetty-env.xml
             //and process it if it exists
@@ -93,12 +110,12 @@ public class EnvConfiguration extends AbstractConfiguration
                 org.eclipse.jetty.util.resource.Resource jettyEnv = web_inf.addPath("jetty-env.xml");
                 if(jettyEnv.exists())
                 {
-                    jettyEnvXmlUrl = jettyEnv.getURL();
+                    url = jettyEnv.getURL();
                 }
             }
         }
 
-        if (jettyEnvXmlUrl != null)
+        if (url != null)
         {
             synchronized (localContextRoot.getRoot())
             {
@@ -120,7 +137,7 @@ public class EnvConfiguration extends AbstractConfiguration
                 try
                 {
                     localContextRoot.getRoot().addListener(listener);
-                    XmlConfiguration configuration = new XmlConfiguration(jettyEnvXmlUrl);
+                    XmlConfiguration configuration = new XmlConfiguration(url);
                     configuration.configure(context);
                 }
                 finally

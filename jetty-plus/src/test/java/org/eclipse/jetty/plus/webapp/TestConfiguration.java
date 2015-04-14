@@ -25,6 +25,7 @@ import javax.naming.Context;
 import javax.naming.InitialContext;
 
 import org.eclipse.jetty.plus.jndi.EnvEntry;
+import org.eclipse.jetty.plus.jndi.JndiFeature;
 import org.eclipse.jetty.plus.jndi.NamingEntry;
 import org.eclipse.jetty.plus.jndi.NamingEntryUtil;
 import org.eclipse.jetty.server.Server;
@@ -47,6 +48,9 @@ public class TestConfiguration
             Server server = new Server();
 
             WebAppContext wac = new WebAppContext();
+            new JndiFeature().preEnable(wac);
+            new PlusFeature().preEnable(wac);
+
             wac.setServer(server);
             wac.setClassLoader(new WebAppClassLoader(Thread.currentThread().getContextClassLoader(), wac));
 

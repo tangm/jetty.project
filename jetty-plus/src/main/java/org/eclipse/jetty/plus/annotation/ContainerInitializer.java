@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 
 import javax.servlet.ServletContainerInitializer;
 
+import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.eclipse.jetty.util.Loader;
 import org.eclipse.jetty.util.StringUtil;
@@ -82,7 +83,7 @@ public class ContainerInitializer
         return _target;
     }
 
-    public Class[] getInterestedTypes ()
+    public Class<?>[] getInterestedTypes ()
     {
         return _interestedTypes;
     }
@@ -114,7 +115,7 @@ public class ContainerInitializer
     }
 
 
-    public void callStartup(WebAppContext context)
+    public void callStartup(ContextHandler context)
     throws Exception
     {
         if (_target != null)

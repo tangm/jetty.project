@@ -246,15 +246,14 @@ public class ServletContextHandler extends ContextHandler
                     handler.setHandler(_servletHandler);
             }
             handler=_servletHandler;
-        }
-        
+        }      
     }
     
     @Override
-    protected void doStart() throws Exception
+    protected void preConfigure() throws Exception
     {
         getServletContext().setAttribute(DecoratedObjectFactory.ATTR, _objFactory);
-        super.doStart();
+        super.preConfigure();
     }
     
     /* ------------------------------------------------------------ */
