@@ -115,7 +115,6 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         "org.xml.",                         // needed by javax.xml
         "org.w3c.",                         // needed by javax.xml
         "org.eclipse.jetty.continuation.",  // webapp cannot change continuation classes
-        "org.eclipse.jetty.jaas.",          // webapp cannot change jaas classes
         "org.eclipse.jetty.util.log.",      // webapp should use server log
         "org.eclipse.jetty.servlet.ServletContextHandler.Decorator", // for CDI / weld use
         "org.eclipse.jetty.servlet.DefaultServlet", // webapp cannot change default servlets
@@ -130,7 +129,6 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     public final static String[] __dftServerClasses =
     {
         "-org.eclipse.jetty.continuation.", // don't hide continuation classes
-        "-org.eclipse.jetty.jaas.",         // don't hide jaas classes
         "-org.eclipse.jetty.servlets.",     // don't hide jetty servlets
         "-org.eclipse.jetty.servlet.DefaultServlet", // don't hide default servlet
         "-org.eclipse.jetty.jsp.",          //don't hide jsp servlet
@@ -339,13 +337,12 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     {
         super.setClassLoader(classLoader);
 
-//        if ( !(classLoader instanceof WebAppClassLoader) )
-//        {
-//            LOG.info("NOTE: detected a classloader which is not an instance of WebAppClassLoader being set on WebAppContext, some typical class and resource locations may be missing on: " + toString() );
-//        }
-
+        String name = getDisplayName();
+        if (name==null) 
+            name=getContextPath();
+        
         if (classLoader!=null && classLoader instanceof WebAppClassLoader && getDisplayName()!=null)
-            ((WebAppClassLoader)classLoader).setName(getDisplayName());
+            ((WebAppClassLoader)classLoader).setName(name);
     }
 
     /* ------------------------------------------------------------ */
