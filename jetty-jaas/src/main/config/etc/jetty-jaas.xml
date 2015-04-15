@@ -14,7 +14,7 @@
     
   <Call name="addBean">
     <Arg>
-      <New class="org.eclipse.jetty.webapp.JndiWebAppFeature"/>
+      <New class="org.eclipse.jetty.webapp.JndiFeature"/>
     </Arg>
   </Call>
 </Configure>

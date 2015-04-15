@@ -24,11 +24,11 @@ import org.eclipse.jetty.webapp.WebAppFeature;
 /* ------------------------------------------------------------ */
 /** Enable visibility of JAAS classes from within a WebApplication 
  */
-public class JaasWebAppFeature extends WebAppFeature
+public class JaasFeature extends WebAppFeature
 {
-    public static final String ENABLE_KEY=JaasWebAppFeature.class.getPackage().getName()+".jaas";
+    public static final String ENABLE_KEY=JaasFeature.class.getPackage().getName()+".jaas";
     
-    public JaasWebAppFeature()
+    public JaasFeature()
     {
         super(ENABLE_KEY,"org.eclipse.jetty.jaas.");
     }

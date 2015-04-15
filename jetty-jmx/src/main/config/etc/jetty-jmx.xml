@@ -25,7 +25,7 @@
   <!-- Make MBean classes visible to webapplications -->
   <Call name="addBean">
     <Arg>
-      <New class="org.eclipse.jetty.webapp.JmxWebAppFeature" />
+      <New class="org.eclipse.jetty.webapp.JmxFeature" />
     </Arg>
   </Call>
   

@@ -24,11 +24,11 @@ import org.eclipse.jetty.webapp.WebAppFeature;
 /* ------------------------------------------------------------ */
 /** Enable visibility of Jetty style JMX MBeans from within a WebApplication 
  */
-public class JmxWebAppFeature extends WebAppFeature
+public class JmxFeature extends WebAppFeature
 {
-    public static final String ENABLE_KEY=JmxWebAppFeature.class.getPackage().getName()+".jmx";
+    public static final String ENABLE_KEY=JmxFeature.class.getPackage().getName()+".jmx";
     
-    public JmxWebAppFeature()
+    public JmxFeature()
     {
         super(ENABLE_KEY,true,null,
               new String[] {
