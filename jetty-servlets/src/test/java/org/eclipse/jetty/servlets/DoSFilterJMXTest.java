@@ -31,6 +31,7 @@ import org.eclipse.jetty.jmx.MBeanContainer;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.context.ManagedAttributeFeature;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.junit.Assert;
@@ -42,6 +43,7 @@ public class DoSFilterJMXTest
     public void testDoSFilterJMX() throws Exception
     {
         Server server = new Server();
+        server.addBean(new ManagedAttributeFeature());
         Connector connector = new ServerConnector(server);
         server.addConnector(connector);
 

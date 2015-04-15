@@ -20,6 +20,8 @@ package org.eclipse.jetty.server;
 
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.util.TypeUtil;
+import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.log.Logger;
 
 
 /* ------------------------------------------------------------ */
@@ -63,7 +65,9 @@ import org.eclipse.jetty.util.TypeUtil;
  * </pre>
  */
 public abstract class AbstractFeature implements Feature
-{
+{    
+    private static final Logger LOG = Log.getLogger(AbstractFeature.class);
+
     private final String _enableKey;
     private final Boolean _enableDefault;
 
@@ -114,6 +118,9 @@ public abstract class AbstractFeature implements Feature
         if (enable==null)
             enable=_enableDefault;
         
+        if (LOG.isDebugEnabled())
+            LOG.debug("preEnable {}={}",this,enable);
+        
         if (TypeUtil.isTrue(enable))
         {
             return doPreEnable(context);
@@ -149,6 +156,8 @@ public abstract class AbstractFeature implements Feature
     {
         // Is feature explicitly turned off by init param?
         String init = context.getInitParameter(_enableKey);
+        if (LOG.isDebugEnabled())
+            LOG.debug("enable {}={}",this,init);
         if (TypeUtil.isFalse(init))
             return false;
 
@@ -158,6 +167,8 @@ public abstract class AbstractFeature implements Feature
             enable=init;
         if (enable==null && context.getServer()!=null)
             enable=context.getServer().getAttribute(_enableKey);
+        if (LOG.isDebugEnabled())
+            LOG.debug("enable {} force={}",this,enable);
         boolean force = TypeUtil.isTrue(enable);
         
         return doEnable(context,force);    

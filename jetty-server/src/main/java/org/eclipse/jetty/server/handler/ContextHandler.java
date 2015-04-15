@@ -74,6 +74,7 @@ import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HandlerContainer;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.context.ManagedAttributeFeature;
 import org.eclipse.jetty.util.Attributes;
 import org.eclipse.jetty.util.AttributesMap;
 import org.eclipse.jetty.util.FutureCallback;
@@ -120,7 +121,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     public static final int DEFAULT_LISTENER_TYPE_INDEX = 1;
     public static final int EXTENDED_LISTENER_TYPE_INDEX = 0;
 
-
     final private static String __unimplmented="Unimplemented - use org.eclipse.jetty.servlet.ServletContextHandler";
 
     private static final Logger LOG = Log.getLogger(ContextHandler.class);
@@ -130,7 +130,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     /**
      * If a context attribute with this name is set, it is interpreted as a comma separated list of attribute name. Any other context attributes that are set
      * with a name from this list will result in a call to {@link #setManagedAttribute(String, Object)}, which typically initiates the creation of a JMX MBean
-     * for the attribute value.
+     * for the attribute value. This requires the {@link ManagedAttributeFeature} to be added to the server or context.
      */
     public static final String MANAGED_ATTRIBUTES = "org.eclipse.jetty.server.context.ManagedAttributes";
 
@@ -185,7 +185,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     private final List<ServletRequestListener> _requestListeners=new CopyOnWriteArrayList<>();
     private final List<ServletRequestAttributeListener> _requestAttributeListeners=new CopyOnWriteArrayList<>();
     private final List<EventListener> _durableListeners = new CopyOnWriteArrayList<>();
-    private Map<String, Object> _managedAttributes;
     private String[] _protectedTargets;
     private final List<AliasCheck> _aliasChecks = new CopyOnWriteArrayList<ContextHandler.AliasCheck>();
     private final Map<String,Feature> _features = new HashMap<>();
@@ -827,25 +826,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
      */
     protected void startContext() throws Exception
     {
-        String managedAttributes = _initParams.get(MANAGED_ATTRIBUTES);
-        if (managedAttributes != null)
-        {
-            _managedAttributes = new HashMap<String, Object>();
-            String[] attributes = managedAttributes.split(",");
-            for (String attribute : attributes)
-            {
-                _managedAttributes.put(attribute.trim(),null);
-            }
-
-            Enumeration<String> e = _scontext.getAttributeNames();
-            while (e.hasMoreElements())
-            {
-                String name = e.nextElement();
-                Object value = _scontext.getAttribute(name);
-                checkManagedAttribute(name,value);
-            }
-        }
-
         super.doStart();
         
         // start features 
@@ -931,13 +911,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
 
             if (_errorHandler != null)
                 _errorHandler.stop();
-
-            Enumeration<String> e = _scontext.getAttributeNames();
-            while (e.hasMoreElements())
-            {
-                String name = e.nextElement();
-                checkManagedAttribute(name,null);
-            }
 
             for (EventListener l : _programmaticListeners)
                 removeEventListener(l);
@@ -1336,7 +1309,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     @Override
     public void removeAttribute(String name)
     {
-        checkManagedAttribute(name,null);
         _attributes.removeAttribute(name);
     }
 
@@ -1350,7 +1322,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     @Override
     public void setAttribute( String name, Object value)
     {
-        checkManagedAttribute(name,value);
         _attributes.setAttribute(name,value);
     }
 
@@ -1363,41 +1334,13 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     {
         _attributes.clearAttributes();
         _attributes.addAll(attributes);
-        Enumeration<String> e = _attributes.getAttributeNames();
-        while (e.hasMoreElements())
-        {
-            String name = e.nextElement();
-            checkManagedAttribute(name,attributes.getAttribute(name));
-        }
     }
 
     /* ------------------------------------------------------------ */
     @Override
     public void clearAttributes()
     {
-        Enumeration<String> e = _attributes.getAttributeNames();
-        while (e.hasMoreElements())
-        {
-            String name = e.nextElement();
-            checkManagedAttribute(name,null);
-        }
         _attributes.clearAttributes();
-    }
-
-    /* ------------------------------------------------------------ */
-    public void checkManagedAttribute(String name, Object value)
-    {
-        if (_managedAttributes != null && _managedAttributes.containsKey(name))
-        {
-            setManagedAttribute(name,value);
-        }
-    }
-
-    /* ------------------------------------------------------------ */
-    public void setManagedAttribute(String name, Object value)
-    {
-        Object old = _managedAttributes.put(name,value);
-        updateBean(old,value);
     }
 
     /* ------------------------------------------------------------ */
@@ -2212,7 +2155,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         @Override
         public synchronized void setAttribute(String name, Object value)
         {
-            checkManagedAttribute(name,value);
             Object old_value = super.getAttribute(name);
 
             if (value == null)
@@ -2243,8 +2185,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
         @Override
         public synchronized void removeAttribute(String name)
         {
-            checkManagedAttribute(name,null);
-
             Object old_value = super.getAttribute(name);
             super.removeAttribute(name);
             if (old_value != null &&!_contextAttributeListeners.isEmpty())

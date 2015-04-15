@@ -262,7 +262,7 @@ public class StringUtilTest
         Assert.assertEquals("foo",array[0]);
         Assert.assertEquals("bar",array[1]);
         
-        array=StringUtil.split(" foo ,   bar   ,   ");
+        array=StringUtil.split(" foo\n,   bar \n  ,   ");
         Assert.assertEquals(2,array.length);
         Assert.assertEquals("foo",array[0]);
         Assert.assertEquals("bar",array[1]);

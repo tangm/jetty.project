@@ -709,7 +709,7 @@ public class StringUtil
         if (s.length()==2)
             return new String[]{};
 
-        return s.substring(1,s.length()-1).split("\\h*,\\h*");
+        return s.substring(1,s.length()-1).split("\\s*,\\s*");
     }
     
     // Split a comma separated string
@@ -723,7 +723,7 @@ public class StringUtil
         if (value.indexOf(',')<0)
             return new String[]{value};
         
-        return value.split("\\h*,\\h*");
+        return value.split("\\s*,\\s*");
     }
 
 }

@@ -22,6 +22,20 @@
     </Arg>
   </Call>
 
+  <!-- Make MBean classes visible to webapplications -->
+  <Call name="addBean">
+    <Arg>
+      <New class="org.eclipse.jetty.webapp.JmxWebAppFeature" />
+    </Arg>
+  </Call>
+  
+  <!-- Enable ManagedAttribute handling -->
+  <Call name="addBean">
+    <Arg>
+      <New class="org.eclipse.jetty.server.context.ManagedAttributeFeature" />
+    </Arg>
+  </Call>
+  
   <!-- Add the static log -->
   <Call name="addBean">
     <Arg>

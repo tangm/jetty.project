@@ -49,7 +49,6 @@ public class JndiFeature extends WebAppFeature
         super.doPreEnableWebApp(webapp);
         EnvConfiguration configuration = new EnvConfiguration(_jettyEnvXmlUri);
         
-        
         if (!webapp.addConfiguration(PlusConfiguration.class,configuration) &&
             !webapp.addConfiguration(FragmentConfiguration.class,configuration) &&
             !webapp.addConfiguration(MetaInfConfiguration.class,configuration) &&

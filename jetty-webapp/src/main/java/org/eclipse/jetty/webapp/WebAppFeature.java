@@ -69,6 +69,21 @@ public class WebAppFeature extends AbstractFeature
         if (packageOrClass.startsWith("-") || packageOrClass.contains(",") || packageOrClass.contains(":"))
             throw new IllegalArgumentException();
     }
+    
+    /* ------------------------------------------------------------ */
+    /**
+     * @param enableKey  The key used to identify the feature.
+     * @param packageOrClass A package or class that will be added as a System class pattern and 
+     * as a negative server class pattern by {@link #doPreEnable(ContextHandler)}. This exposes the class or package 
+     * and prevents it being replaced by the web application.
+     * @param serverClasses Server class patterns  comma separated list to add to the webapp in {@link #doPreEnable(ContextHandler)} with {@link WebAppContext#addServerClass(String)}
+     */
+    public WebAppFeature(String enableKey, Boolean enableDefault, String packageOrClass)
+    {
+        this(enableKey,enableDefault,null,new String[]{packageOrClass},new String[] {"-"+packageOrClass});
+        if (packageOrClass.startsWith("-") || packageOrClass.contains(",") || packageOrClass.contains(":"))
+            throw new IllegalArgumentException();
+    }
 
     /* ------------------------------------------------------------ */
     /**
@@ -92,6 +107,23 @@ public class WebAppFeature extends AbstractFeature
     public WebAppFeature(String enableKey ,String servletContainerInitializerClass, String systemClasses, String serverClasses)
     {
         this(enableKey,true,servletContainerInitializerClass,StringUtil.split(systemClasses),StringUtil.split(serverClasses));
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * @param enableKey  The key used to identify the feature.
+     * @param enableDefault The default to enable/disable if specific configuration is not found.
+     * @param servletContainerInitializerClass The class name of a {@link ServletContainerInitializer}, which 
+     * will always be exposed in the class loader by a call to {@link #preEnable(ContextHandler)} 
+     * @param packageOrClass A package or class that will be added as a System class pattern and 
+     * as a negative server class pattern by {@link #doPreEnable(ContextHandler)}. This exposes the class or package 
+     * and prevents it being replaced by the web application.
+     */
+    public WebAppFeature(String enableKey, Boolean enableDefault,String servletContainerInitializerClass, String packageOrClass)
+    {
+        this(enableKey,enableDefault,servletContainerInitializerClass,new String[]{packageOrClass},new String[] {"-"+packageOrClass});
+        if (packageOrClass.startsWith("-") || packageOrClass.contains(",") || packageOrClass.contains(":"))
+            throw new IllegalArgumentException();
     }
     
     /* ------------------------------------------------------------ */
@@ -125,7 +157,7 @@ public class WebAppFeature extends AbstractFeature
         if (_sci!=null && context instanceof WebAppContext)
         {
             WebAppContext webapp = (WebAppContext)context;
-            webapp.prependSystemClass(_sci);
+            webapp.addSystemClass(_sci);
             webapp.prependServerClass("-"+_sci);
         }
         return super.preEnable(context);

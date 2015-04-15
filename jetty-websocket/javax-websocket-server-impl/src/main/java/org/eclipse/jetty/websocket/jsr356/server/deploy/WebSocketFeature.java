@@ -21,10 +21,8 @@ package org.eclipse.jetty.websocket.jsr356.server.deploy;
 import java.util.HashSet;
 import java.util.Set;
 
-import javax.servlet.ServletContainerInitializer;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.annotation.HandlesTypes;
 import javax.websocket.DeploymentException;
 import javax.websocket.Endpoint;
 import javax.websocket.server.ServerApplicationConfig;
@@ -56,8 +54,7 @@ public class WebSocketFeature extends WebAppFeature
     {
         super(ENABLE_KEY,defaultEnable,
               WebSocketServerContainerInitializer.class.getName(),
-              new String[]{"org.eclipse.jetty.websocket."},
-              new String[]{"-org.eclipse.jetty.websocket."});
+              "org.eclipse.jetty.websocket.");
     }
     
     @Override
