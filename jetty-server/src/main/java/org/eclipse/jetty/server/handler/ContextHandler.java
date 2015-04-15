@@ -814,7 +814,13 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     /* ------------------------------------------------------------ */
     public Set<String> getFeatures()
     {
-        return _features.keySet();
+        return Collections.unmodifiableSet(_features.keySet());
+    }
+    
+    /* ------------------------------------------------------------ */
+    public Boolean isFeatureEnabled(String key)
+    {
+        return _features.containsKey(key);
     }
     
     /* ------------------------------------------------------------ */
@@ -2813,5 +2819,6 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             return a.equals(r); 
         }
     }
+
 
 }

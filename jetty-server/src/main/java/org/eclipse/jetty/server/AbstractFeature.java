@@ -18,6 +18,8 @@
 
 package org.eclipse.jetty.server;
 
+import javax.servlet.ServletContext;
+
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.util.TypeUtil;
 import org.eclipse.jetty.util.log.Log;
@@ -190,5 +192,11 @@ public abstract class AbstractFeature implements Feature
     public String toString()
     {
         return String.format("%s@%x{%s}",this.getClass().getSimpleName(),System.identityHashCode(this),_enableKey);
+    }
+
+    public static Boolean isEnabled(ServletContext servletContext, String key)
+    {
+        ContextHandler context = ContextHandler.getContextHandler(servletContext);
+        return context.isFeatureEnabled(key);
     }
 }

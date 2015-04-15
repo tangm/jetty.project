@@ -118,7 +118,6 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         "org.eclipse.jetty.util.log.",      // webapp should use server log
         "org.eclipse.jetty.servlet.ServletContextHandler.Decorator", // for CDI / weld use
         "org.eclipse.jetty.servlet.DefaultServlet", // webapp cannot change default servlets
-        "org.eclipse.jetty.jsp.JettyJspServlet", //webapp cannot change jetty jsp servlet
         "org.eclipse.jetty.servlets.PushCacheFilter" //must be loaded by container classpath
     } ;
 
@@ -131,13 +130,10 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         "-org.eclipse.jetty.continuation.", // don't hide continuation classes
         "-org.eclipse.jetty.servlets.",     // don't hide jetty servlets
         "-org.eclipse.jetty.servlet.DefaultServlet", // don't hide default servlet
-        "-org.eclipse.jetty.jsp.",          //don't hide jsp servlet
         "-org.eclipse.jetty.servlet.listener.", // don't hide useful listeners
         "-org.eclipse.jetty.apache.",       // don't hide jetty apache impls
         "-org.eclipse.jetty.util.log.",     // don't hide server log 
         "-org.eclipse.jetty.servlet.ServletContextHandler.Decorator", // don't hide CDI / weld interface  
-        "org.objectweb.asm.",               // hide asm used by jetty
-        "org.eclipse.jdt.",                 // hide jdt used by jetty
         "org.eclipse.jetty."                // hide other jetty classes
     } ;
 
@@ -1064,6 +1060,16 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         for (int i=0;i<cs.size();i++)
             if (configuration.isAssignableFrom(cs.get(i).getClass()))
                 return cs.remove(i);
+        return null;
+    }
+    
+    /* ------------------------------------------------------------ */
+    public Configuration replaceConfiguration(Class<? extends Configuration> replace, Configuration configuration)
+    {
+        List<Configuration> cs = getConfigurations();
+        for (int i=0;i<cs.size();i++)
+            if (replace.isAssignableFrom(cs.get(i).getClass()))
+                return cs.set(i,configuration);
         return null;
     }
     

@@ -16,28 +16,25 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.annotations;
+package org.eclipse.jetty.webapp;
 
-import org.eclipse.jetty.webapp.JettyWebXmlConfiguration;
-import org.eclipse.jetty.webapp.WebAppContext;
 import org.eclipse.jetty.webapp.WebAppFeature;
 
-public class AnnotationFeature extends WebAppFeature
-{
-    public static final String ENABLE_KEY=AnnotationFeature.class.getPackage().getName();
-    
-    public AnnotationFeature()
-    {
-        super(ENABLE_KEY,(String)null,"org.objectweb.asm.");
-    }
 
-    @Override
-    protected boolean doPreEnableWebApp(WebAppContext webapp)
+/* ------------------------------------------------------------ */
+/** Enable visibility of JSP classes from within a WebApplication 
+ */
+public class JspFeature extends WebAppFeature
+{
+    public static final String ENABLE_KEY="org.eclipse.jetty.jsp";
+    
+    public JspFeature()
     {
-        super.doPreEnableWebApp(webapp);
-        AnnotationConfiguration configuration = new AnnotationConfiguration();
-        if (!webapp.addConfiguration(configuration,JettyWebXmlConfiguration.class))
-            webapp.addConfiguration(configuration);
-        return true;
+        super(ENABLE_KEY,true,null,
+              new String[] {"org.eclipse.jetty.jsp.JettyJspServlet"},
+              new String[] {"-org.eclipse.jetty.jsp.","org.eclipse.jdt."});
+
     }
+    
+    
 }

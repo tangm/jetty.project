@@ -29,6 +29,7 @@ import javax.servlet.ServletContext;
 import org.apache.jasper.servlet.JasperInitializer;
 import org.apache.jasper.servlet.TldPreScanned;
 import org.apache.jasper.servlet.TldScanner;
+import org.eclipse.jetty.server.AbstractFeature;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.xml.sax.SAXException;
@@ -97,8 +98,9 @@ public class JettyJasperInitializer extends JasperInitializer
     @Override
     public TldScanner newTldScanner(ServletContext context, boolean namespaceAware, boolean validate, boolean blockExternal)
     {  
-        String tmp = context.getInitParameter("org.eclipse.jetty.jsp.precompiled");
-        if (tmp!=null && !tmp.equals("") && Boolean.valueOf(tmp))
+        Boolean enabled = AbstractFeature.isEnabled(context,"org.eclipse.jetty.jsp");
+        String precompiled = context.getInitParameter("org.eclipse.jetty.jsp.precompiled");
+        if (Boolean.FALSE.equals(enabled) ||  (precompiled!=null && !precompiled.equals("") && Boolean.valueOf(precompiled)))
         {
             if (LOG.isDebugEnabled()) LOG.debug("Jsp precompilation detected");
             return new NullTldScanner(context, namespaceAware, validate, blockExternal);
