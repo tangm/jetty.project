@@ -18,25 +18,29 @@
 
 package org.eclipse.jetty.http2;
 
+import java.util.Comparator;
+
 import org.eclipse.jetty.util.ArrayTrie;
 import org.eclipse.jetty.util.Trie;
 
 public class HTTP2Cipher
 {
+    public static final Comparator<String> COMPARATOR = new CipherComparator();
+
     private final static Trie<Boolean> __blackProtocols = new ArrayTrie<>(6*5);
     private final static Trie<Boolean> __blackCiphers = new ArrayTrie<>(275*40);
-    
+
     static
     {
-        for (String p : new String[] 
+        for (String p : new String[]
         {
                 "TLSv1.2","TLSv1.1", "TLSv1", "SSL", "SSLv2", "SSLv3"
         })
         {
             __blackProtocols.put(p,Boolean.TRUE);
         }
-        
-        for (String c : new String[] 
+
+        for (String c : new String[]
         {
             "TLS_NULL_WITH_NULL_NULL",
             "TLS_RSA_WITH_NULL_MD5",
@@ -318,17 +322,35 @@ public class HTTP2Cipher
         {
             __blackCiphers.put(c,Boolean.TRUE);
         }
-    };
+    }
 
     public static boolean isBlackListProtocol(String tlsProtocol)
     {
         Boolean b = __blackProtocols.get(tlsProtocol);
-        return b!=null && b.booleanValue();
+        return b != null && b;
     }
 
     public static boolean isBlackListCipher(String tlsCipher)
     {
         Boolean b = __blackCiphers.get(tlsCipher);
-        return b!=null && b.booleanValue();
+        return b != null && b;
+    }
+
+    /**
+     * Comparator that orders non blacklisted ciphers before blacklisted ones.
+     */
+    public static class CipherComparator implements Comparator<String>
+    {
+        @Override
+        public int compare(String c1, String c2)
+        {
+            boolean b1=isBlackListCipher(c1);
+            boolean b2=isBlackListCipher(c2);
+            if (b1==b2)
+                return 0;
+            if (b1)
+                return 1;
+            return -1;
+        }
     }
 }

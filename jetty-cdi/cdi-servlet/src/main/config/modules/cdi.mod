@@ -1,5 +1,5 @@
 #
-# CDI / Weld Jetty module
+# [EXPERIMENTAL] CDI / Weld Jetty module
 #
 
 [depend]

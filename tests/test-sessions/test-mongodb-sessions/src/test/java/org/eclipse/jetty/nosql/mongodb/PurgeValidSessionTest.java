@@ -34,6 +34,7 @@ import javax.servlet.http.HttpSession;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.nosql.mongodb.MongoTestServer.TestMongoSessionIdManager;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.junit.Test;
 
@@ -122,6 +123,75 @@ public class PurgeValidSessionTest
 
     }
 
+
+    @Test
+    public void testPurgeValidSessionWithPurgeLimitSet() throws Exception
+    {
+        String contextPath = "";
+        String servletMapping = "/server";
+        long purgeDelay = 1000; //1 sec
+        long purgeValidAge = 1000; // 1 sec
+        int purgeLimit = 5; // only purge 5 items in each purge run
+
+        //ensure scavenging is turned off so the purger gets a chance to find the session
+        MongoTestServer server = createServer(0, 1, 0);
+        ServletContextHandler context = server.addContext(contextPath);
+        context.addServlet(TestServlet.class, servletMapping);
+
+        MongoSessionManager sessionManager = (MongoSessionManager)context.getSessionHandler().getSessionManager();
+        MongoSessionIdManager idManager = (MongoSessionIdManager)server.getServer().getSessionIdManager();
+        // disable purging we will run it manually below
+        idManager.setPurge(false);
+        idManager.setPurgeLimit(purgeLimit);
+        idManager.setPurgeDelay(purgeDelay);
+        idManager.setPurgeValidAge(purgeValidAge); //purge valid sessions older than
+
+        server.start();
+        int port=server.getPort();
+
+        try
+        {
+            // start with no sessions
+            ((TestMongoSessionIdManager)idManager).deleteAll();
+
+            HttpClient client = new HttpClient();
+            client.start();
+            try
+            {
+                // create double our purgeLmit number of sessions
+                for (int i = 0; i < purgeLimit * 2; i++)
+                {
+                    ContentResponse response = client.GET("http://localhost:" + port + contextPath + servletMapping + "?action=create");
+                    assertEquals(HttpServletResponse.SC_OK, response.getStatus());
+                    String sessionCookie = response.getHeaders().get("Set-Cookie");
+                    assertTrue(sessionCookie != null);
+                    // don't remember our cookies from call to call
+                    client.getCookieStore().removeAll();
+                }
+
+                // delay long enough for purgeValidAge to apply
+                Thread.sleep(2* purgeValidAge);
+
+                // validate that we have the right number of sessions before we purge
+                assertEquals("Expected to find right number of sessions before purge", purgeLimit * 2, sessionManager.getSessionStoreCount());
+
+                // run our purge
+                idManager.purge();
+
+                assertEquals("Expected to find sessions remaining in db after purge run with limit set",
+                        purgeLimit, sessionManager.getSessionStoreCount());
+            }
+            finally
+            {
+                client.stop();
+            }
+        }
+        finally
+        {
+            server.stop();
+        }
+
+    }
 
     public static class TestServlet extends HttpServlet
     {

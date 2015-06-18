@@ -18,7 +18,7 @@
 
 package org.eclipse.jetty.start;
 
-import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -47,9 +47,10 @@ public class TestUseCases
         ret.add(new String[] {"jsp", null});
         ret.add(new String[] {"database", null});
         ret.add(new String[] {"deep-ext", null});
+        ret.add(new String[] {"versioned-modules", null});
         
         // Ones with command lines
-        ret.add(new Object[] {"http2", new String[]{"java.version=1.7.0_60"}});
+        ret.add(new Object[] {"http2", new String[]{"java.version=1.8.0_31"}});
         ret.add(new Object[] {"basic-properties", new String[]{"port=9090"}});
         ret.add(new Object[] {"agent-properties", new String[]{"java.vm.specification.version=1.6"}});
         
@@ -65,13 +66,13 @@ public class TestUseCases
     @Test
     public void testUseCase() throws Exception
     {
-        File homeDir = MavenTestingUtils.getTestResourceDir("dist-home");
-        File baseDir = MavenTestingUtils.getTestResourceDir("usecases/" + caseName);
+        Path homeDir = MavenTestingUtils.getTestResourceDir("dist-home").toPath().toRealPath();
+        Path baseDir = MavenTestingUtils.getTestResourceDir("usecases/" + caseName).toPath().toRealPath();
 
         Main main = new Main();
         List<String> cmdLine = new ArrayList<>();
-        cmdLine.add("jetty.home=" + homeDir.getAbsolutePath());
-        cmdLine.add("jetty.base=" + baseDir.getAbsolutePath());
+        cmdLine.add("jetty.home=" + homeDir.toString());
+        cmdLine.add("jetty.base=" + baseDir.toString());
         // cmdLine.add("--debug");
 
         if (commandLineArgs != null)

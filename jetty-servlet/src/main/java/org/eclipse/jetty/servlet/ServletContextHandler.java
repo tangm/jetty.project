@@ -66,15 +66,16 @@ import org.eclipse.jetty.util.annotation.ManagedAttribute;
 import org.eclipse.jetty.util.annotation.ManagedObject;
 import org.eclipse.jetty.util.component.LifeCycle;
 
-
-/* ------------------------------------------------------------ */
-/** Servlet Context.
+/** 
+ * Servlet Context.
+ * <p>
  * This extension to the ContextHandler allows for
  * simple construction of a context with ServletHandler and optionally
- * session and security handlers, et.<pre>
+ * session and security handlers, et.
+ * <pre>
  *   new ServletContext("/context",Context.SESSIONS|Context.NO_SECURITY);
  * </pre>
- * <p/>
+ * <p>
  * This class should have been called ServletContext, but this would have
  * cause confusion with {@link ServletContext}.
  */
@@ -393,7 +394,10 @@ public class ServletContextHandler extends ContextHandler
     }
     
     /* ------------------------------------------------------------ */
-    /** conveniance method to add a servlet.
+    /** Convenience method to add a servlet.
+     * @param className the servlet class name
+     * @param pathSpec the path spec to map servlet to
+     * @return the ServletHolder for the added servlet
      */
     public ServletHolder addServlet(String className,String pathSpec)
     {
@@ -401,7 +405,10 @@ public class ServletContextHandler extends ContextHandler
     }
 
     /* ------------------------------------------------------------ */
-    /** conveniance method to add a servlet.
+    /** Convenience method to add a servlet.
+     * @param servlet the servlet class
+     * @param pathSpec the path spec to map servlet to
+     * @return the ServletHolder for the added servlet
      */
     public ServletHolder addServlet(Class<? extends Servlet> servlet,String pathSpec)
     {
@@ -409,7 +416,9 @@ public class ServletContextHandler extends ContextHandler
     }
 
     /* ------------------------------------------------------------ */
-    /** conveniance method to add a servlet.
+    /** Convenience method to add a servlet.
+     * @param servlet the servlet holder
+     * @param pathSpec the path spec
      */
     public void addServlet(ServletHolder servlet,String pathSpec)
     {
@@ -417,7 +426,10 @@ public class ServletContextHandler extends ContextHandler
     }
 
     /* ------------------------------------------------------------ */
-    /** conveniance method to add a filter
+    /** Convenience method to add a filter
+     * @param holder the filter holder
+     * @param pathSpec the path spec
+     * @param dispatches the dispatcher types for this filter
      */
     public void addFilter(FilterHolder holder,String pathSpec,EnumSet<DispatcherType> dispatches)
     {
@@ -425,7 +437,11 @@ public class ServletContextHandler extends ContextHandler
     }
 
     /* ------------------------------------------------------------ */
-    /** convenience method to add a filter
+    /** Convenience method to add a filter
+     * @param filterClass the filter class
+     * @param pathSpec the path spec
+     * @param dispatches the dispatcher types for this filter
+     * @return the FilterHolder that was created
      */
     public FilterHolder addFilter(Class<? extends Filter> filterClass,String pathSpec,EnumSet<DispatcherType> dispatches)
     {
@@ -433,7 +449,11 @@ public class ServletContextHandler extends ContextHandler
     }
 
     /* ------------------------------------------------------------ */
-    /** convenience method to add a filter
+    /** Convenience method to add a filter
+     * @param filterClass the filter class name 
+     * @param pathSpec the path spec
+     * @param dispatches the dispatcher types for this filter
+     * @return the FilterHolder that was created
      */
     public FilterHolder addFilter(String filterClass,String pathSpec,EnumSet<DispatcherType> dispatches)
     {

@@ -309,6 +309,9 @@ public class HttpClient extends ContainerLifeCycle
      *
      * @param uri the URI to GET
      * @return the {@link ContentResponse} for the request
+     * @throws InterruptedException if send threading has been interrupted
+     * @throws ExecutionException the execution failed
+     * @throws TimeoutException the send timed out
      * @see #GET(URI)
      */
     public ContentResponse GET(String uri) throws InterruptedException, ExecutionException, TimeoutException
@@ -321,6 +324,9 @@ public class HttpClient extends ContainerLifeCycle
      *
      * @param uri the URI to GET
      * @return the {@link ContentResponse} for the request
+     * @throws InterruptedException if send threading has been interrupted
+     * @throws ExecutionException the execution failed
+     * @throws TimeoutException the send timed out
      * @see #newRequest(URI)
      */
     public ContentResponse GET(URI uri) throws InterruptedException, ExecutionException, TimeoutException
@@ -334,6 +340,9 @@ public class HttpClient extends ContainerLifeCycle
      * @param uri the URI to POST
      * @param fields the fields composing the form name/value pairs
      * @return the {@link ContentResponse} for the request
+     * @throws InterruptedException if send threading has been interrupted
+     * @throws ExecutionException the execution failed
+     * @throws TimeoutException the send timed out
      */
     public ContentResponse FORM(String uri, Fields fields) throws InterruptedException, ExecutionException, TimeoutException
     {
@@ -346,6 +355,9 @@ public class HttpClient extends ContainerLifeCycle
      * @param uri the URI to POST
      * @param fields the fields composing the form name/value pairs
      * @return the {@link ContentResponse} for the request
+     * @throws InterruptedException if send threading has been interrupted
+     * @throws ExecutionException the execution failed
+     * @throws TimeoutException the send timed out
      */
     public ContentResponse FORM(URI uri, Fields fields) throws InterruptedException, ExecutionException, TimeoutException
     {
@@ -516,7 +528,8 @@ public class HttpClient extends ContainerLifeCycle
         if (!HttpScheme.HTTP.is(scheme) && !HttpScheme.HTTPS.is(scheme))
             throw new IllegalArgumentException("Invalid protocol " + scheme);
 
-        HttpDestination destination = destinationFor(scheme, request.getHost(), request.getPort());
+        String host = request.getHost().toLowerCase(Locale.ENGLISH);
+        HttpDestination destination = destinationFor(scheme, host, request.getPort());
         destination.send(request, listeners);
     }
 
@@ -719,7 +732,7 @@ public class HttpClient extends ContainerLifeCycle
 
     /**
      * Sets the max number of connections to open to each destinations.
-     * <p />
+     * <p>
      * RFC 2616 suggests that 2 connections should be opened per each destination,
      * but browsers commonly open 6.
      * If this {@link HttpClient} is used for load testing, it is common to have only one destination
@@ -743,7 +756,7 @@ public class HttpClient extends ContainerLifeCycle
 
     /**
      * Sets the max number of requests that may be queued to a destination.
-     * <p />
+     * <p>
      * If this {@link HttpClient} performs a high rate of requests to a destination,
      * and all the connections managed by that destination are busy with other requests,
      * then new requests will be queued up in the destination.
@@ -839,7 +852,7 @@ public class HttpClient extends ContainerLifeCycle
 
     /**
      * Whether to dispatch I/O operations from the selector thread to a different thread.
-     * <p />
+     * <p>
      * This implementation never blocks on I/O operation, but invokes application callbacks that may
      * take time to execute or block on other I/O.
      * If application callbacks are known to take time or block on I/O, then parameter {@code dispatchIO}
@@ -866,17 +879,17 @@ public class HttpClient extends ContainerLifeCycle
 
     /**
      * Whether request/response events must be strictly ordered with respect to connection usage.
-     * <p />
+     * <p>
      * From the point of view of connection usage, the connection can be reused just before the
      * "complete" event notified to {@link org.eclipse.jetty.client.api.Response.CompleteListener}s
      * (but after the "success" event).
-     * <p />
+     * <p>
      * When a request/response exchange is completing, the destination may have another request
      * queued to be sent to the server.
      * If the connection for that destination is reused for the second request before the "complete"
      * event of the first exchange, it may happen that the "begin" event of the second request
      * happens before the "complete" event of the first exchange.
-     * <p />
+     * <p>
      * Enforcing strict ordering of events so that a "begin" event of a request can never happen
      * before the "complete" event of the previous exchange comes with the cost of increased
      * connection usage.
@@ -885,7 +898,7 @@ public class HttpClient extends ContainerLifeCycle
      * when the connection cannot yet be reused.
      * When strict event ordering is not enforced, the redirect request will reuse the already
      * open connection making the system more efficient.
-     * <p />
+     * <p>
      * The default value for this property is {@code false}.
      *
      * @param strictEventOrdering whether request/response events must be strictly ordered
@@ -906,7 +919,7 @@ public class HttpClient extends ContainerLifeCycle
 
     /**
      * Whether destinations that have no connections (nor active nor idle) should be removed.
-     * <p />
+     * <p>
      * Applications typically make request to a limited number of destinations so keeping
      * destinations around is not a problem for the memory or the GC.
      * However, for applications that hit millions of different destinations (e.g. a spider

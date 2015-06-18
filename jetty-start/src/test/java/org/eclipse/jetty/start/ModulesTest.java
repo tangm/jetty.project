@@ -28,17 +28,17 @@ import org.eclipse.jetty.start.config.CommandLineConfigSource;
 import org.eclipse.jetty.start.config.ConfigSources;
 import org.eclipse.jetty.start.config.JettyBaseConfigSource;
 import org.eclipse.jetty.start.config.JettyHomeConfigSource;
-import org.eclipse.jetty.start.graph.HowSetPredicate;
+import org.eclipse.jetty.start.graph.CriteriaSetPredicate;
 import org.eclipse.jetty.start.graph.Predicate;
 import org.eclipse.jetty.start.graph.RegexNamePredicate;
 import org.eclipse.jetty.start.graph.Selection;
 import org.eclipse.jetty.toolchain.test.MavenTestingUtils;
 import org.eclipse.jetty.toolchain.test.TestingDir;
+import org.hamcrest.Matchers;
 import org.junit.Rule;
 import org.junit.Test;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.assertThat;
 
 public class ModulesTest
@@ -72,6 +72,11 @@ public class ModulesTest
         // Test Modules
         Modules modules = new Modules(basehome,args);
         modules.registerAll();
+
+        // Check versions
+        assertThat(System.getProperty("java.version.major"),equalTo("1"));
+        assertThat(System.getProperty("java.version.minor"),anyOf(equalTo("7"),Matchers.equalTo("8"),Matchers.equalTo("9")));
+
 
         List<String> moduleNames = new ArrayList<>();
         for (Module mod : modules)
@@ -134,8 +139,10 @@ public class ModulesTest
         expected.add("stats");
         expected.add("webapp");
         expected.add("websocket");
-        expected.add("xinetd");
-        
+        expected.add("infinispan");
+        expected.add("jdbc-sessions");
+        expected.add("nosql");
+
         ConfigurationAssert.assertContainsUnordered("All Modules",expected,moduleNames);
     }
 
@@ -144,6 +151,7 @@ public class ModulesTest
      * In other words. ${search-dir}/modules/*.mod should be the only
      * valid references, but ${search-dir}/alt/foo/modules/*.mod should
      * not be considered valid.
+     * @throws IOException on test failures
      */
     @Test
     public void testLoadShallowModulesOnly() throws IOException
@@ -190,7 +198,7 @@ public class ModulesTest
         // Test Env
         File homeDir = MavenTestingUtils.getTestResourceDir("dist-home");
         File baseDir = testdir.getEmptyDir();
-        String cmdLine[] = new String[] { "jetty.version=TEST", "java.version=1.7.0_60" };
+        String cmdLine[] = new String[] { "jetty.version=TEST", "java.version=1.8.0_31" };
 
         // Configuration
         CommandLineConfigSource cmdLineSource = new CommandLineConfigSource(cmdLine);
@@ -239,6 +247,7 @@ public class ModulesTest
         expected.add("deploy");
         expected.add("plus");
         expected.add("annotations");
+        expected.add("jdbc-sessions");
 
         List<String> resolved = new ArrayList<>();
         for (Module module : modules.getSelected())
@@ -479,12 +488,12 @@ public class ModulesTest
         {
             Module altMod = modules.get(expectedAlt);
             assertThat("Alt.mod[" + expectedAlt + "].selected",altMod.isSelected(),is(true));
-            Set<String> sources = altMod.getSelectedHowSet();
+            Set<String> sources = altMod.getSelectedCriteriaSet();
             assertThat("Alt.mod[" + expectedAlt + "].sources: [" + Utils.join(sources,", ") + "]",sources,contains(alt));
         }
 
         // Now collect the unique source list
-        List<Module> alts = modules.getMatching(new HowSetPredicate(alt));
+        List<Module> alts = modules.getMatching(new CriteriaSetPredicate(alt));
 
         // Assert names are correct, and in the right order
         actualNames = new ArrayList<>();

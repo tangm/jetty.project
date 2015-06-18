@@ -39,9 +39,6 @@ public class ServletContainerInitializersStarter extends AbstractLifeCycle imple
     private static final Logger LOG = Log.getLogger(ServletContainerInitializersStarter.class);
     ContextHandler _context;
     
-    /**
-     * @param context
-     */
     public ServletContainerInitializersStarter(ContextHandler context)
     {
         _context = context;

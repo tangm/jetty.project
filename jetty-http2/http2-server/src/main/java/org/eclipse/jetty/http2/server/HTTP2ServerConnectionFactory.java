@@ -64,15 +64,15 @@ public class HTTP2ServerConnectionFactory extends AbstractHTTP2ServerConnectionF
     @Override
     public boolean isAcceptable(String protocol, String tlsProtocol, String tlsCipher)
     {
-        // TODO remove this draft protection
-        if ("h2-14".equals(protocol))
-            return true;
-        
+        // TODO remove this draft 14 protection
         // Implement 9.2.2
-        return !(HTTP2Cipher.isBlackListProtocol(tlsProtocol) && HTTP2Cipher.isBlackListCipher(tlsCipher));
+        boolean acceptable = "h2-14".equals(protocol) || !(HTTP2Cipher.isBlackListProtocol(tlsProtocol) && HTTP2Cipher.isBlackListCipher(tlsCipher));
+        if (LOG.isDebugEnabled())
+            LOG.debug("proto={} tls={} cipher={} 9.2.2-acceptable={}",protocol,tlsProtocol,tlsCipher,acceptable);
+        return acceptable;
     }
 
-    public class HTTPServerSessionListener extends ServerSessionListener.Adapter implements Stream.Listener
+    private class HTTPServerSessionListener extends ServerSessionListener.Adapter implements Stream.Listener
     {
         private final Connector connector;
         private final EndPoint endPoint;
@@ -83,11 +83,11 @@ public class HTTP2ServerConnectionFactory extends AbstractHTTP2ServerConnectionF
             this.endPoint = endPoint;
         }
 
-        public Connector getConnector()
+        private HTTP2ServerConnection getConnection()
         {
-            return connector;
+            return (HTTP2ServerConnection)endPoint.getConnection();
         }
-        
+
         @Override
         public Map<Integer, Integer> onPreface(Session session)
         {
@@ -103,7 +103,7 @@ public class HTTP2ServerConnectionFactory extends AbstractHTTP2ServerConnectionF
         @Override
         public Stream.Listener onNewStream(Stream stream, HeadersFrame frame)
         {
-            ((HTTP2ServerConnection)endPoint.getConnection()).onNewStream(connector, (IStream)stream, frame);
+            getConnection().onNewStream(connector, (IStream)stream, frame);
             return frame.isEndStream() ? null : this;
         }
 
@@ -125,11 +125,7 @@ public class HTTP2ServerConnectionFactory extends AbstractHTTP2ServerConnectionF
         @Override
         public void onData(Stream stream, DataFrame frame, Callback callback)
         {
-            if (LOG.isDebugEnabled())
-                LOG.debug("Processing {} on {}", frame, stream);
-
-            HttpChannelOverHTTP2 channel = (HttpChannelOverHTTP2)stream.getAttribute(IStream.CHANNEL_ATTRIBUTE);
-            channel.requestContent(frame, callback);
+            getConnection().onData((IStream)stream, frame, callback);
         }
 
         @Override

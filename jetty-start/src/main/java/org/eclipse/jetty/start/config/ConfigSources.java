@@ -37,7 +37,6 @@ import org.eclipse.jetty.start.UsageException;
 
 /**
  * Weighted List of ConfigSources.
- * <p>
  */
 public class ConfigSources implements Iterable<ConfigSource>
 {
@@ -74,7 +73,7 @@ public class ConfigSources implements Iterable<ConfigSource>
             {
                 String ref = getValue(arg.getLine());
                 String dirName = props.expand(ref);
-                Path dir = FS.toPath(dirName);
+                Path dir = FS.toPath(dirName).normalize().toAbsolutePath();
                 DirConfigSource dirsource = new DirConfigSource(ref,dir,sourceWeight.incrementAndGet(),true);
                 add(dirsource);
             }

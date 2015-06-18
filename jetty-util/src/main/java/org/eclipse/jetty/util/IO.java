@@ -18,6 +18,7 @@
 
 package org.eclipse.jetty.util;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -108,6 +109,9 @@ public class IO
     
     /* ------------------------------------------------------------------- */
     /** Copy Stream in to Stream out until EOF or exception.
+     * @param in the input stream to read from (until EOF)
+     * @param out the output stream to write to
+     * @throws IOException if unable to copy streams 
      */
     public static void copy(InputStream in, OutputStream out)
          throws IOException
@@ -117,6 +121,9 @@ public class IO
     
     /* ------------------------------------------------------------------- */
     /** Copy Reader to Writer out until EOF or exception.
+     * @param in the read to read from (until EOF)
+     * @param out the writer to write to
+     * @throws IOException if unable to copy the streams
      */
     public static void copy(Reader in, Writer out)
          throws IOException
@@ -126,6 +133,10 @@ public class IO
     
     /* ------------------------------------------------------------------- */
     /** Copy Stream in to Stream for byteCount bytes or until EOF or exception.
+     * @param in the stream to read from
+     * @param out the stream to write to
+     * @param byteCount the number of bytes to copy
+     * @throws IOException if unable to copy the streams
      */
     public static void copy(InputStream in,
                             OutputStream out,
@@ -163,6 +174,10 @@ public class IO
     
     /* ------------------------------------------------------------------- */
     /** Copy Reader to Writer for byteCount bytes or until EOF or exception.
+     * @param in the Reader to read from
+     * @param out the Writer to write to
+     * @param byteCount the number of bytes to copy
+     * @throws IOException if unable to copy streams
      */
     public static void copy(Reader in,
                             Writer out,
@@ -213,9 +228,9 @@ public class IO
 
     /* ------------------------------------------------------------ */
     /** Copy files or directories
-     * @param from
-     * @param to
-     * @throws IOException
+     * @param from the file to copy
+     * @param to the destination to copy to
+     * @throws IOException if unable to copy
      */
     public static void copy(File from,File to) throws IOException
     {
@@ -261,6 +276,9 @@ public class IO
     
     /* ------------------------------------------------------------ */
     /** Read input stream to string.
+     * @param in the stream to read from (until EOF)
+     * @return the String parsed from stream (default Charset)
+     * @throws IOException if unable to read the stream (or handle the charset)
      */
     public static String toString(InputStream in)
         throws IOException
@@ -270,6 +288,10 @@ public class IO
     
     /* ------------------------------------------------------------ */
     /** Read input stream to string.
+     * @param in the stream to read from (until EOF)
+     * @param encoding the encoding to use (can be null to use default Charset)
+     * @return the String parsed from the stream
+     * @throws IOException if unable to read the stream (or handle the charset) 
      */
     public static String toString(InputStream in,String encoding)
         throws IOException
@@ -278,6 +300,10 @@ public class IO
     }
 
     /** Read input stream to string.
+     * @param in the stream to read from (until EOF)
+     * @param encoding the Charset to use (can be null to use default Charset)
+     * @return the String parsed from the stream
+     * @throws IOException if unable to read the stream (or handle the charset) 
      */
     public static String toString(InputStream in, Charset encoding)
             throws IOException
@@ -291,6 +317,9 @@ public class IO
 
     /* ------------------------------------------------------------ */
     /** Read input stream to string.
+     * @param in the reader to read from (until EOF)
+     * @return the String parsed from the reader
+     * @throws IOException if unable to read the stream (or handle the charset) 
      */
     public static String toString(Reader in)
         throws IOException
@@ -304,7 +333,8 @@ public class IO
     /* ------------------------------------------------------------ */
     /** Delete File.
      * This delete will recursively delete directories - BE CAREFULL
-     * @param file The file to be deleted.
+     * @param file The file (or directory) to be deleted.
+     * @return true if anything was deleted. (note: this does not mean that all content in a directory was deleted)
      */
     public static boolean delete(File file)
     {
@@ -318,8 +348,25 @@ public class IO
         }
         return file.delete();
     }
+    
+    /**
+     * Closes an arbitrary closable, and logs exceptions at ignore level
+     *
+     * @param closeable the closeable to close
+     */
+    public static void close(Closeable closeable)
+    {
+        try
+        {
+            if (closeable != null)
+                closeable.close();
+        }
+        catch (IOException ignore)
+        {
+            LOG.ignore(ignore);
+        }
+    }
 
-    /* ------------------------------------------------------------ */
     /**
      * closes an input stream, and logs exceptions
      *
@@ -327,15 +374,17 @@ public class IO
      */
     public static void close(InputStream is)
     {
-        try
-        {
-            if (is != null)
-                is.close();
-        }
-        catch (IOException e)
-        {
-            LOG.ignore(e);
-        }
+        close((Closeable)is);
+    }
+    
+    /**
+     * closes an output stream, and logs exceptions
+     *
+     * @param os the output stream to close
+     */
+    public static void close(OutputStream os)
+    {
+        close((Closeable)os);
     }
 
     /**
@@ -345,14 +394,7 @@ public class IO
      */
     public static void close(Reader reader)
     {
-        try
-        {
-            if (reader != null)
-                reader.close();
-        } catch (IOException e)
-        {
-            LOG.ignore(e);
-        }
+        close((Closeable)reader);
     }
 
     /**
@@ -362,14 +404,7 @@ public class IO
      */
     public static void close(Writer writer)
     {
-        try
-        {
-            if (writer != null)
-                writer.close();
-        } catch (IOException e)
-        {
-            LOG.ignore(e);
-        }
+        close((Closeable)writer);
     }
     
     /* ------------------------------------------------------------ */
@@ -381,25 +416,6 @@ public class IO
         return bout.toByteArray();
     }
     
-    /* ------------------------------------------------------------ */
-    /**
-     * closes an output stream, and logs exceptions
-     *
-     * @param os the output stream to close
-     */
-    public static void close(OutputStream os)
-    {
-        try
-        {
-            if (os != null)
-                os.close();
-        }
-        catch (IOException e)
-        {
-            LOG.ignore(e);
-        }
-    }
-
     /* ------------------------------------------------------------ */
     /** 
      * @return An outputstream to nowhere

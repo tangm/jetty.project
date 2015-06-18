@@ -21,6 +21,7 @@ package org.eclipse.jetty.util.ssl;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.is;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
@@ -213,29 +214,14 @@ public class SslContextFactoryTest
     }
 
     @Test
-    public void testSetIncludeCipherSuitesPreservesOrder()
+    public void testProtocolAndCipherSettingsAreNPESafe()
     {
-        String[] supportedCipherSuites = new String[]{"cipher4", "cipher2", "cipher1", "cipher3"};
-        String[] includeCipherSuites = {"cipher1", "cipher3", "cipher4"};
-
-        cf.setIncludeCipherSuites(includeCipherSuites);
-        String[] selectedCipherSuites = cf.selectCipherSuites(null, supportedCipherSuites);
-
-        assertSelectedMatchesIncluded(includeCipherSuites, selectedCipherSuites);
+    	assertNotNull(cf.getExcludeProtocols());
+    	assertNotNull(cf.getIncludeProtocols());
+    	assertNotNull(cf.getExcludeCipherSuites());
+    	assertNotNull(cf.getIncludeCipherSuites());
     }
-
-    @Test
-    public void testSetIncludeProtocolsPreservesOrder()
-    {
-        String[] supportedProtocol = new String[]{"cipher4", "cipher2", "cipher1", "cipher3"};
-        String[] includeProtocol = {"cipher1", "cipher3", "cipher4"};
-
-        cf.setIncludeProtocols(includeProtocol);
-        String[] selectedProtocol = cf.selectProtocols(null, supportedProtocol);
-
-        assertSelectedMatchesIncluded(includeProtocol, selectedProtocol);
-    }
-
+    
     private void assertSelectedMatchesIncluded(String[] includeStrings, String[] selectedStrings)
     {
         assertThat(includeStrings.length + " strings are selected", selectedStrings.length, is(includeStrings.length));

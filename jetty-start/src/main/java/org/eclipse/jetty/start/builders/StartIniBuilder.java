@@ -40,8 +40,7 @@ import org.eclipse.jetty.start.graph.OnlyTransitivePredicate;
 /**
  * Management of the <code>${jetty.base}/start.ini</code> based configuration.
  * <p>
- * Implementation of the <code>--add-to-start=[name]</code> command line
- * behavior
+ * Implementation of the <code>--add-to-start=[name]</code> command line behavior
  */
 public class StartIniBuilder implements BaseBuilder.Config
 {
@@ -96,29 +95,37 @@ public class StartIniBuilder implements BaseBuilder.Config
             // skip, already present
             return false;
         }
-        
-        if (module.isVirtual())
+
+        if (module.isDynamic())
         {
-            // skip, no need to reference
-            StartLog.info("%-15s skipping (virtual module)",module.getName());
+            if (module.hasIniTemplate())
+            {
+                // warn
+                StartLog.warn("%-15s not adding [ini-template] from dynamic module",module.getName());
+            }
             return false;
         }
-        
+
         String mode = "";
-        if (module.matches(OnlyTransitivePredicate.INSTANCE))
+        boolean isTransitive = module.matches(OnlyTransitivePredicate.INSTANCE);
+        if (isTransitive)
         {
             mode = "(transitively) ";
         }
 
-        StartLog.info("%-15s initialised %sin %s",module.getName(),mode,baseHome.toShortForm(startIni));
-
-        // Append to start.ini
-        try (BufferedWriter writer = Files.newBufferedWriter(startIni,StandardCharsets.UTF_8,StandardOpenOption.APPEND,StandardOpenOption.CREATE))
+        if (module.hasIniTemplate() || !isTransitive)
         {
-            writeModuleSection(writer,module);
+            StartLog.info("%-15s initialised %sin %s",module.getName(),mode,baseHome.toShortForm(startIni));
+
+            // Append to start.ini
+            try (BufferedWriter writer = Files.newBufferedWriter(startIni,StandardCharsets.UTF_8,StandardOpenOption.APPEND,StandardOpenOption.CREATE))
+            {
+                writeModuleSection(writer,module);
+            }
+            return true;
         }
 
-        return true;
+        return false;
     }
 
     protected void writeModuleSection(BufferedWriter writer, Module module)
@@ -127,12 +134,11 @@ public class StartIniBuilder implements BaseBuilder.Config
 
         out.println("# --------------------------------------- ");
         out.println("# Module: " + module.getName());
-
         out.println("--module=" + module.getName());
+        out.println();
 
-        for (String line : module.getDefaultConfig())
+        for (String line : module.getIniTemplate())
         {
-            // TODO: validate property keys
             out.println(line);
         }
 

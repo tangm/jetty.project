@@ -35,14 +35,13 @@ import org.eclipse.jetty.util.annotation.ManagedAttribute;
 import org.eclipse.jetty.util.annotation.ManagedObject;
 
 /* ------------------------------------------------------------ */
-/** A collection of handlers.
+/** 
+ * A collection of handlers.
  * <p>
  * The default implementations  calls all handlers in list order,
  * regardless of the response status or exceptions. Derived implementation
  * may alter the order or the conditions of calling the contained
  * handlers.
- * <p>
- *
  */
 @ManagedObject("Handler of multiple handlers")
 public class HandlerCollection extends AbstractHandlerContainer
@@ -133,17 +132,6 @@ public class HandlerCollection extends AbstractHandlerContainer
             }
 
         }
-    }
-
-    /* ------------------------------------------------------------ */
-    @Override
-    public void setServer(Server server)
-    {
-        super.setServer(server);
-        Handler[] handlers=getHandlers();
-        if (handlers!=null)
-            for (Handler h : handlers)
-                h.setServer(server);
     }
 
     /* ------------------------------------------------------------ */

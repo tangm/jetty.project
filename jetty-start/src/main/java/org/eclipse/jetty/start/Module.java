@@ -40,6 +40,8 @@ import org.eclipse.jetty.start.graph.Node;
  */
 public class Module extends Node<Module>
 {
+    private static final String VERSION_UNSPECIFIED = "9.2";
+
     public static class NameComparator implements Comparator<Module>
     {
         private Collator collator = Collator.getInstance();
@@ -56,20 +58,35 @@ public class Module extends Node<Module>
 
     /** The file of the module */
     private Path file;
+    
     /** The name of this Module (as a filesystem reference) */
     private String fileRef;
+    
+    /** The version of Jetty the module supports */
+    private Version version;
 
     /** List of xml configurations for this Module */
     private List<String> xmls;
+    
     /** List of ini template lines */
+    private List<String> iniTemplate;
+    private boolean hasIniTemplate = false;
+    
+    /** List of default config */
     private List<String> defaultConfig;
     private boolean hasDefaultConfig = false;
+    
     /** List of library options for this Module */
     private List<String> libs;
+    
     /** List of files for this Module */
     private List<String> files;
+    /** Skip File Validation (default: false) */
+    private boolean skipFilesValidation = false;
+    
     /** List of jvm Args */
     private List<String> jvmArgs;
+    
     /** License lines */
     private List<String> license;
 
@@ -131,10 +148,20 @@ public class Module extends Node<Module>
     {
         return defaultConfig;
     }
+    
+    public List<String> getIniTemplate()
+    {
+        return iniTemplate;
+    }
 
     public List<String> getFiles()
     {
         return files;
+    }
+
+    public boolean isSkipFilesValidation()
+    {
+        return skipFilesValidation;
     }
 
     public String getFilesystemRef()
@@ -156,15 +183,25 @@ public class Module extends Node<Module>
     {
         return license;
     }
-
+    
     public List<String> getXmls()
     {
         return xmls;
+    }
+    
+    public Version getVersion()
+    {
+        return version;
     }
 
     public boolean hasDefaultConfig()
     {
         return hasDefaultConfig;
+    }
+    
+    public boolean hasIniTemplate()
+    {
+        return hasIniTemplate;
     }
 
     @Override
@@ -185,6 +222,7 @@ public class Module extends Node<Module>
     {
         xmls = new ArrayList<>();
         defaultConfig = new ArrayList<>();
+        iniTemplate = new ArrayList<>();
         libs = new ArrayList<>();
         files = new ArrayList<>();
         jvmArgs = new ArrayList<>();
@@ -203,16 +241,21 @@ public class Module extends Node<Module>
         setName(this.fileRef);
     }
 
-    public boolean isVirtual()
+    /**
+     * Indicates a module that is dynamic in nature
+     * 
+     * @return a module where the declared metadata name does not match the filename reference (aka a dynamic module)
+     */
+    public boolean isDynamic()
     {
         return !getName().equals(fileRef);
     }
 
-    public boolean hasFiles(BaseHome baseHome)
+    public boolean hasFiles(BaseHome baseHome, Props props)
     {
         for (String ref : getFiles())
         {
-            FileArg farg = new FileArg(this,ref);
+            FileArg farg = new FileArg(this,props.expand(ref));
             Path refPath = baseHome.getBasePath(farg.location);
             if (!Files.exists(refPath))
             {
@@ -251,9 +294,12 @@ public class Module extends Node<Module>
                     // blank lines and comments are valid for ini-template section
                     if ((line.length() == 0) || line.startsWith("#"))
                     {
+                        // Remember ini comments and whitespace (empty lines)
+                        // for the [ini-template] section
                         if ("INI-TEMPLATE".equals(sectionType))
                         {
-                            defaultConfig.add(line);
+                            iniTemplate.add(line);
+                            hasIniTemplate = true;
                         }
                     }
                     else
@@ -269,10 +315,14 @@ public class Module extends Node<Module>
                             case "FILES":
                                 files.add(line);
                                 break;
-                            case "DEFAULTS":
-                            case "INI-TEMPLATE":
+                            case "DEFAULTS": // old name introduced in 9.2.x
+                            case "INI": // new name for 9.3+
                                 defaultConfig.add(line);
                                 hasDefaultConfig = true;
+                                break;
+                            case "INI-TEMPLATE":
+                                iniTemplate.add(line);
+                                hasIniTemplate = true;
                                 break;
                             case "LIB":
                                 libs.add(line);
@@ -290,6 +340,13 @@ public class Module extends Node<Module>
                             case "EXEC":
                                 jvmArgs.add(line);
                                 break;
+                            case "VERSION":
+                                if (version != null)
+                                {
+                                    throw new IOException("[version] already specified");
+                                }
+                                version = new Version(line);
+                                break;
                             case "XML":
                                 xmls.add(line);
                                 break;
@@ -300,19 +357,29 @@ public class Module extends Node<Module>
                 }
             }
         }
+        
+        if (version == null)
+        {
+            version = new Version(VERSION_UNSPECIFIED);
+        }
     }
 
     public void setEnabled(boolean enabled)
     {
         throw new RuntimeException("Don't enable directly");
     }
-
+    
+    public void setSkipFilesValidation(boolean skipFilesValidation)
+    {
+        this.skipFilesValidation = skipFilesValidation;
+    }
+    
     @Override
     public String toString()
     {
         StringBuilder str = new StringBuilder();
         str.append("Module[").append(getName());
-        if (isVirtual())
+        if (isDynamic())
         {
             str.append(",file=").append(fileRef);
         }

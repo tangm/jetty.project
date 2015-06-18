@@ -39,6 +39,8 @@ import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.ByteArrayISO8859Writer;
+import org.eclipse.jetty.util.Jetty;
+import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 
@@ -161,7 +163,9 @@ public class ErrorHandler extends AbstractHandler
         writeErrorPageMessage(request,writer,code,message,uri);
         if (showStacks)
             writeErrorPageStacks(request,writer);
-        writer.write("<hr><i><small>Powered by Jetty://</small></i><hr/>\n");
+
+        Request.getBaseRequest(request).getHttpChannel().getHttpConfiguration()
+            .writePoweredBy(writer,"<hr>","<hr/>\n");
     }
 
     /* ------------------------------------------------------------ */
@@ -275,29 +279,7 @@ public class ErrorHandler extends AbstractHandler
         if (string==null)
             return;
 
-        for (int i=0;i<string.length();i++)
-        {
-            char c=string.charAt(i);
-
-            switch(c)
-            {
-                case '&' :
-                    writer.write("&amp;");
-                    break;
-                case '<' :
-                    writer.write("&lt;");
-                    break;
-                case '>' :
-                    writer.write("&gt;");
-                    break;
-
-                default:
-                    if (Character.isISOControl(c) && !Character.isWhitespace(c))
-                        writer.write('?');
-                    else
-                        writer.write(c);
-            }
-        }
+        writer.write(StringUtil.sanitizeXmlString(string));
     }
 
     /* ------------------------------------------------------------ */

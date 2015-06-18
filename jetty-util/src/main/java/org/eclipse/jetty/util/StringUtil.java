@@ -64,6 +64,8 @@ public class StringUtil
     /* ------------------------------------------------------------ */
     /** Convert alternate charset names (eg utf8) to normalized
      * name (eg UTF-8).
+     * @param s the charset to normalize
+     * @return the normalized charset (or null if normalized version not found)
      */
     public static String normalizeCharset(String s)
     {
@@ -74,6 +76,10 @@ public class StringUtil
     /* ------------------------------------------------------------ */
     /** Convert alternate charset names (eg utf8) to normalized
      * name (eg UTF-8).
+     * @param s the charset to normalize
+     * @param offset the offset in the charset
+     * @param length the length of the charset in the input param
+     * @return the normalized charset (or null if not found)
      */
     public static String normalizeCharset(String s,int offset,int length)
     {
@@ -199,6 +205,9 @@ public class StringUtil
     /* ------------------------------------------------------------ */
     /**
      * returns the next index of a character from the chars string
+     * @param s the input string to search
+     * @param chars the chars to look for
+     * @return the index of the character in the input stream found.
      */
     public static int indexFrom(String s,String chars)
     {
@@ -211,6 +220,10 @@ public class StringUtil
     /* ------------------------------------------------------------ */
     /**
      * replace substrings within string.
+     * @param s the input string
+     * @param sub the string to look for
+     * @param with the string to replace with
+     * @return the now replaced string
      */
     public static String replace(String s, String sub, String with)
     {
@@ -238,6 +251,8 @@ public class StringUtil
 
     /* ------------------------------------------------------------ */
     /** Remove single or double quotes.
+     * @param s the input string
+     * @return the string with quotes removed
      */
     public static String unquote(String s)
     {
@@ -273,6 +288,9 @@ public class StringUtil
     /* ------------------------------------------------------------ */
     /**
      * append hex digit
+     * @param buf the buffer to append to
+     * @param b the byte to append
+     * @param base the base of the hex output (almost always 16).
      * 
      */
     public static void append(StringBuilder buf,byte b,int base)
@@ -289,6 +307,12 @@ public class StringUtil
     }
 
     /* ------------------------------------------------------------ */
+    /**
+     * Append 2 digits (zero padded) to the StringBuffer
+     * 
+     * @param buf the buffer to append to
+     * @param i the value to append
+     */
     public static void append2digits(StringBuffer buf,int i)
     {
         if (i<100)
@@ -299,6 +323,12 @@ public class StringUtil
     }
     
     /* ------------------------------------------------------------ */
+    /**
+     * Append 2 digits (zero padded) to the StringBuilder
+     * 
+     * @param buf the buffer to append to
+     * @param i the value to append
+     */
     public static void append2digits(StringBuilder buf,int i)
     {
         if (i<100)
@@ -501,6 +531,8 @@ public class StringUtil
      * http://en.wikipedia.org/wiki/Security_Identifier
      * 
      * S-1-IdentifierAuthority-SubAuthority1-SubAuthority2-...-SubAuthorityn
+     * @param sidBytes the SID bytes to build from
+     * @return the string SID
      */
     public static String sidBytesToString(byte[] sidBytes)
     {
@@ -548,6 +580,8 @@ public class StringUtil
      * http://en.wikipedia.org/wiki/Security_Identifier
      * 
      * S-1-IdentifierAuthority-SubAuthority1-SubAuthority2-...-SubAuthorityn
+     * @param sidString the string SID
+     * @return the binary SID
      */
     public static byte[] sidStringToBytes( String sidString )
     {
@@ -724,6 +758,87 @@ public class StringUtil
             return new String[]{value};
         
         return value.split("\\s*,\\s*");
+    }
+    
+    public static String sanitizeXmlString(String html)
+    {
+        if (html==null)
+            return null;
+        
+        int i=0;
+        
+        // Are there any characters that need sanitizing?
+        loop: for (;i<html.length();i++)
+        {
+            char c=html.charAt(i);
+
+            switch(c)
+            {
+                case '&' :
+                case '<' :
+                case '>' :
+                case '\'':
+                case '"':
+                    break loop;
+
+                default:
+                    if (Character.isISOControl(c) && !Character.isWhitespace(c))
+                        break loop;
+            }
+        }
+
+        // No characters need sanitizing, so return original string
+        if (i==html.length())
+            return html;
+        
+        // Create builder with OK content so far 
+        StringBuilder out = new StringBuilder(html.length()*4/3);
+        out.append(html,0,i);
+        
+        // sanitize remaining content
+        for (;i<html.length();i++)
+        {
+            char c=html.charAt(i);
+
+            switch(c)
+            {
+                case '&' :
+                    out.append("&amp;");
+                    break;
+                case '<' :
+                    out.append("&lt;");
+                    break;
+                case '>' :
+                    out.append("&gt;");
+                    break;
+                case '\'':
+                    out.append("&apos;");
+                    break;
+                case '"':
+                    out.append("&quot;");
+                    break;
+
+                default:
+                    if (Character.isISOControl(c) && !Character.isWhitespace(c))
+                        out.append('?');
+                    else
+                        out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    
+    /* ------------------------------------------------------------ */
+    /** The String value of an Object
+     * <p>This method calls {@link String#valueOf(Object)} unless the object is null,
+     * in which case null is returned</p>
+     * @param object The object
+     * @return String value or null
+     */
+    public static String valueOf(Object object)
+    {
+        return object==null?null:String.valueOf(object);
     }
 
 }

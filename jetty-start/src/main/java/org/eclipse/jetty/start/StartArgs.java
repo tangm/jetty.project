@@ -18,11 +18,13 @@
 
 package org.eclipse.jetty.start;
 
-import static org.eclipse.jetty.start.UsageException.ERR_BAD_ARG;
+import static org.eclipse.jetty.start.UsageException.*;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -32,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
 
@@ -49,40 +52,87 @@ public class StartArgs
 
     static
     {
+        // Use command line versions
         String ver = System.getProperty("jetty.version",null);
+        String tag = System.getProperty("jetty.tag.version","master");
 
+        // Use META-INF/MANIFEST.MF versions
         if (ver == null)
         {
             Package pkg = StartArgs.class.getPackage();
             if ((pkg != null) && "Eclipse.org - Jetty".equals(pkg.getImplementationVendor()) && (pkg.getImplementationVersion() != null))
             {
                 ver = pkg.getImplementationVersion();
+                if (tag == null)
+                {
+                    tag = "jetty-" + ver;
+                }
             }
         }
 
+        // Use jetty-version.properties values
         if (ver == null)
         {
-            ver = "TEST";
+            URL url = Thread.currentThread().getContextClassLoader().getResource("jetty-version.properties");
+            if (url != null)
+            {
+                try (InputStream in = url.openStream())
+                {
+                    Properties props = new Properties();
+                    props.load(in);
+                    ver = props.getProperty("jetty.version");
+                }
+                catch (IOException ignore)
+                {
+                    StartLog.debug(ignore);
+                }
+            }
+        }
+        
+        // Default values
+        if (ver == null)
+        {
+            ver = "0.0";
+            if (tag == null)
+            {
+                tag = "master";
+            }
+        }
+
+        // Set Tag Defaults
+        if (tag == null || tag.contains("-SNAPSHOT"))
+        {
+            tag = "master";
         }
 
         VERSION = ver;
         System.setProperty("jetty.version",VERSION);
+        System.setProperty("jetty.tag.version",tag);
     }
 
     private static final String SERVER_MAIN = "org.eclipse.jetty.xml.XmlConfiguration";
 
     /** List of enabled modules */
     private Set<String> modules = new HashSet<>();
+
+    /** List of modules to skip [files] section validation */
+    private Set<String> skipFileValidationModules = new HashSet<>();
+
     /** Map of enabled modules to the source of where that activation occurred */
     private Map<String, List<String>> sources = new HashMap<>();
+
     /** Map of properties to where that property was declared */
     private Map<String, String> propertySource = new HashMap<>();
+
     /** List of all active [files] sections from enabled modules */
     private List<FileArg> files = new ArrayList<>();
+
     /** List of all active [lib] sections from enabled modules */
     private Classpath classpath;
+
     /** List of all active [xml] sections from enabled modules */
     private List<Path> xmls = new ArrayList<>();
+
     /** JVM arguments, found via commmand line and in all active [exec] sections from enabled modules */
     private List<String> jvmArgs = new ArrayList<>();
 
@@ -91,7 +141,7 @@ public class StartArgs
 
     /** List of all property references found directly on command line or start.ini */
     private List<String> propertyFileRefs = new ArrayList<>();
-    
+
     /** List of all property files */
     private List<Path> propertyFiles = new ArrayList<>();
 
@@ -113,12 +163,12 @@ public class StartArgs
     private Modules allModules;
     /** Should the server be run? */
     private boolean run = true;
-    
+
     /** Download related args */
     private boolean download = false;
     private boolean licenseCheckRequired = false;
     private boolean testingMode = false;
-    
+
     private boolean help = false;
     private boolean stopCommand = false;
     private boolean listModules = false;
@@ -137,7 +187,13 @@ public class StartArgs
 
     private void addFile(Module module, String uriLocation)
     {
-        FileArg arg = new FileArg(module, uriLocation);
+        if (module.isSkipFilesValidation())
+        {
+            StartLog.debug("Not validating %s [files] for %s",module,uriLocation);
+            return;
+        }
+
+        FileArg arg = new FileArg(module,properties.expand(uriLocation));
         if (!files.contains(arg))
         {
             files.add(arg);
@@ -162,7 +218,7 @@ public class StartArgs
             xmls.add(xmlfile);
         }
     }
-    
+
     private void addUniquePropertyFile(String propertyFileRef, Path propertyFile) throws IOException
     {
         if (!FS.canReadFile(propertyFile))
@@ -216,9 +272,10 @@ public class StartArgs
         System.out.println("Jetty Environment:");
         System.out.println("-----------------");
         dumpProperty("jetty.version");
+        dumpProperty("jetty.tag.version");
         dumpProperty("jetty.home");
         dumpProperty("jetty.base");
-        
+
         // Jetty Configuration Environment
         System.out.println();
         System.out.println("Config Search Order:");
@@ -236,7 +293,7 @@ public class StartArgs
             }
             System.out.println();
         }
-        
+
         // Jetty Se
         System.out.println();
     }
@@ -349,7 +406,8 @@ public class StartArgs
     }
 
     /**
-     * Ensure that the System Properties are set (if defined as a System property, or start.config property, or start.ini property)
+     * Ensure that the System Properties are set (if defined as a System property, or start.config property, or
+     * start.ini property)
      * 
      * @param key
      *            the key to be sure of
@@ -378,7 +436,9 @@ public class StartArgs
      * Expand any command line added <code>--lib</code> lib references.
      * 
      * @param baseHome
+     *            the base home in use
      * @throws IOException
+     *             if unable to expand the libraries
      */
     public void expandLibs(BaseHome baseHome) throws IOException
     {
@@ -388,10 +448,10 @@ public class StartArgs
             StartLog.debug("rawlibref = " + rawlibref);
             String libref = properties.expand(rawlibref);
             StartLog.debug("expanded = " + libref);
-            
+
             // perform path escaping (needed by windows)
             libref = libref.replaceAll("\\\\([^\\\\])","\\\\\\\\$1");
-            
+
             for (Path libpath : baseHome.getPaths(libref))
             {
                 classpath.addComponent(libpath.toFile());
@@ -403,8 +463,11 @@ public class StartArgs
      * Build up the Classpath and XML file references based on enabled Module list.
      * 
      * @param baseHome
+     *            the base home in use
      * @param activeModules
+     *            the active (selected) modules
      * @throws IOException
+     *             if unable to expand the modules
      */
     public void expandModules(BaseHome baseHome, List<Module> activeModules) throws IOException
     {
@@ -434,7 +497,7 @@ public class StartArgs
             for (String xmlRef : module.getXmls())
             {
                 // Straight Reference
-                xmlRef=properties.expand(xmlRef);
+                xmlRef = properties.expand(xmlRef);
                 Path xmlfile = baseHome.getPath(xmlRef);
                 addUniqueXmlFile(xmlRef,xmlfile);
             }
@@ -521,7 +584,7 @@ public class StartArgs
         if (dryRun || isExec())
         {
             for (Prop p : properties)
-                cmd.addRawArg(CommandLineBuilder.quote(p.key)+"="+CommandLineBuilder.quote(p.value));
+                cmd.addRawArg(CommandLineBuilder.quote(p.key) + "=" + CommandLineBuilder.quote(p.value));
         }
         else if (properties.size() > 0)
         {
@@ -538,7 +601,7 @@ public class StartArgs
         {
             cmd.addRawArg(xml.toAbsolutePath().toString());
         }
-        
+
         for (Path propertyFile : propertyFiles)
         {
             cmd.addRawArg(propertyFile.toAbsolutePath().toString());
@@ -569,7 +632,7 @@ public class StartArgs
             // Try generic env variable
             localRepo = System.getenv("MAVEN_LOCAL_REPO");
         }
-        
+
         // TODO: load & use $HOME/.m2/settings.xml ?
         // TODO: possibly use Eclipse Aether to manage it ?
         // TODO: see https://bugs.eclipse.org/bugs/show_bug.cgi?id=449511
@@ -601,6 +664,11 @@ public class StartArgs
     public Props getProperties()
     {
         return properties;
+    }
+
+    public Set<String> getSkipFileValidationModules()
+    {
+        return skipFileValidationModules;
     }
 
     public List<String> getSources(String module)
@@ -652,12 +720,12 @@ public class StartArgs
     {
         return exec;
     }
-    
+
     public boolean isLicenseCheckRequired()
     {
         return licenseCheckRequired;
     }
-    
+
     public boolean isNormalMainClass()
     {
         return SERVER_MAIN.equals(getMainClassname());
@@ -692,7 +760,7 @@ public class StartArgs
     {
         return stopCommand;
     }
-    
+
     public boolean isTestingModeEnabled()
     {
         return testingMode;
@@ -724,9 +792,12 @@ public class StartArgs
     /**
      * Parse a single line of argument.
      * 
-     * @param rawarg the raw argument to parse
-     * @param source the origin of this line of argument
-     * @param replaceProps true if properties in this parse replace previous ones, false to not replace.
+     * @param rawarg
+     *            the raw argument to parse
+     * @param source
+     *            the origin of this line of argument
+     * @param replaceProps
+     *            true if properties in this parse replace previous ones, false to not replace.
      */
     private void parse(final String rawarg, String source, boolean replaceProps)
     {
@@ -734,7 +805,7 @@ public class StartArgs
         {
             return;
         }
-        
+
         StartLog.debug("parse(\"%s\", \"%s\", %b)",rawarg,source,replaceProps);
 
         final String arg = rawarg.trim();
@@ -761,7 +832,7 @@ public class StartArgs
             // valid, but handled in StartLog instead
             return;
         }
-        
+
         if ("--testing-mode".equals(arg))
         {
             System.setProperty("org.eclipse.jetty.start.testing","true");
@@ -887,6 +958,17 @@ public class StartArgs
             return;
         }
 
+        // Skip [files] validation on a module
+        if (arg.startsWith("--skip-file-validation="))
+        {
+            List<String> moduleNames = Props.getValues(arg);
+            for (String moduleName : moduleNames)
+            {
+                skipFileValidationModules.add(moduleName);
+            }
+            return;
+        }
+
         // Create graphviz output of module graph
         if (arg.startsWith("--write-module-graph="))
         {
@@ -968,7 +1050,7 @@ public class StartArgs
             }
             return;
         }
-        
+
         if (FS.isPropertyFile(arg))
         {
             // only add non-duplicates
@@ -976,7 +1058,7 @@ public class StartArgs
             {
                 propertyFileRefs.add(arg);
             }
-                return;
+            return;
         }
 
         // Anything else is unrecognized
@@ -1000,9 +1082,9 @@ public class StartArgs
 
     public void parseModule(Module module)
     {
-        if(module.hasDefaultConfig()) 
+        if (module.hasDefaultConfig())
         {
-            for(String line: module.getDefaultConfig())
+            for (String line : module.getDefaultConfig())
             {
                 parse(line,module.getFilesystemRef(),false);
             }
@@ -1023,7 +1105,7 @@ public class StartArgs
             addUniqueXmlFile(xmlRef,xmlfile);
         }
     }
-    
+
     public void resolvePropertyFiles(BaseHome baseHome) throws IOException
     {
         // Find and Expand property files

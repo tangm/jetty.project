@@ -40,10 +40,12 @@ import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.io.MappedByteBufferPool;
+import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpConnection;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.util.DecoratedObjectFactory;
+import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
@@ -65,6 +67,7 @@ import org.eclipse.jetty.websocket.common.events.EventDriver;
 import org.eclipse.jetty.websocket.common.events.EventDriverFactory;
 import org.eclipse.jetty.websocket.common.extensions.ExtensionStack;
 import org.eclipse.jetty.websocket.common.extensions.WebSocketExtensionFactory;
+import org.eclipse.jetty.websocket.common.io.AbstractWebSocketConnection;
 import org.eclipse.jetty.websocket.common.scopes.WebSocketContainerScope;
 import org.eclipse.jetty.websocket.servlet.ServletUpgradeRequest;
 import org.eclipse.jetty.websocket.servlet.ServletUpgradeResponse;
@@ -515,13 +518,13 @@ public class WebSocketServerFactory extends ContainerLifeCycle implements WebSoc
     {
         registeredSocketClasses.add(websocketPojo);
     }
-    
+
     @Override
     public void setCreator(WebSocketCreator creator)
     {
         this.creator = creator;
     }
-    
+
     /**
      * Upgrade the request/response to a WebSocket Connection.
      * <p/>
@@ -566,7 +569,7 @@ public class WebSocketServerFactory extends ContainerLifeCycle implements WebSoc
             }
             else
             {
-                warn.append('"').append(ua.replaceAll("<", "&lt;")).append("\" ");
+                warn.append('"').append(StringUtil.sanitizeXmlString(ua)).append("\" ");
             }
             warn.append("requested WebSocket version [").append(version);
             warn.append("], Jetty supports version");
@@ -601,11 +604,12 @@ public class WebSocketServerFactory extends ContainerLifeCycle implements WebSoc
 
         // Get original HTTP connection
         EndPoint endp = http.getEndPoint();
-        Executor executor = http.getConnector().getExecutor();
-        ByteBufferPool bufferPool = http.getConnector().getByteBufferPool();
+        Connector connector = http.getConnector();
+        Executor executor = connector.getExecutor();
+        ByteBufferPool bufferPool = connector.getByteBufferPool();
 
         // Setup websocket connection
-        WebSocketServerConnection wsConnection = new WebSocketServerConnection(endp, executor, scheduler, driver.getPolicy(), bufferPool);
+        AbstractWebSocketConnection wsConnection = new WebSocketServerConnection(endp, executor, scheduler, driver.getPolicy(), bufferPool);
 
         extensionStack.setPolicy(driver.getPolicy());
         extensionStack.configure(wsConnection.getParser());

@@ -20,6 +20,7 @@ package org.eclipse.jetty.proxy;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -32,7 +33,9 @@ import java.util.concurrent.TimeoutException;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
+import javax.servlet.UnavailableException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -43,11 +46,38 @@ import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpHeaderValue;
+import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.util.HttpCookieStore;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
+/**
+ * <p>Abstract base class for proxy servlets.</p>
+ * <p>Forwards requests to another server either as a standard web reverse
+ * proxy or as a transparent reverse proxy (as defined by RFC 7230).</p>
+ * <p>To facilitate JMX monitoring, the {@link HttpClient} instance is set
+ * as ServletContext attribute, prefixed with this servlet's name and
+ * exposed by the mechanism provided by
+ * {@link ServletContext#setAttribute(String, Object)}.</p>
+ * <p>The following init parameters may be used to configure the servlet:</p>
+ * <ul>
+ * <li>preserveHost - the host header specified by the client is forwarded to the server</li>
+ * <li>hostHeader - forces the host header to a particular value</li>
+ * <li>viaHost - the name to use in the Via header: Via: http/1.1 &lt;viaHost&gt;</li>
+ * <li>whiteList - comma-separated list of allowed proxy hosts</li>
+ * <li>blackList - comma-separated list of forbidden proxy hosts</li>
+ * </ul>
+ * <p>In addition, see {@link #createHttpClient()} for init parameters
+ * used to configure the {@link HttpClient} instance.</p>
+ * <p>NOTE: By default the Host header sent to the server by this proxy
+ * servlet is the server's host name. However, this breaks redirects.
+ * Set {@code preserveHost} to {@code true} to make redirects working,
+ * although this may break server's virtual host selection.</p>
+ * <p>The default behavior of not preserving the Host header mimics
+ * the default behavior of Apache httpd and Nginx, which both have
+ * a way to be configured to preserve the Host header.</p>
+ */
 public abstract class AbstractProxyServlet extends HttpServlet
 {
     protected static final Set<String> HOP_HEADERS;
@@ -69,6 +99,7 @@ public abstract class AbstractProxyServlet extends HttpServlet
     private final Set<String> _whiteList = new HashSet<>();
     private final Set<String> _blackList = new HashSet<>();
     protected Logger _log;
+    private boolean _preserveHost;
     private String _hostHeader;
     private String _viaHost;
     private HttpClient _client;
@@ -80,6 +111,8 @@ public abstract class AbstractProxyServlet extends HttpServlet
         _log = createLogger();
 
         ServletConfig config = getServletConfig();
+
+        _preserveHost = Boolean.parseBoolean(config.getInitParameter("preserveHost"));
 
         _hostHeader = config.getInitParameter("hostHeader");
 
@@ -179,10 +212,10 @@ public abstract class AbstractProxyServlet extends HttpServlet
     }
 
     /**
-     * Creates a {@link HttpClient} instance, configured with init parameters of this servlet.
-     * <p/>
-     * The init parameters used to configure the {@link HttpClient} instance are:
+     * <p>Creates a {@link HttpClient} instance, configured with init parameters of this servlet.</p>
+     * <p>The init parameters used to configure the {@link HttpClient} instance are:</p>
      * <table>
+     * <caption>Init Parameters</caption>
      * <thead>
      * <tr>
      * <th>init-param</th>
@@ -234,10 +267,10 @@ public abstract class AbstractProxyServlet extends HttpServlet
 
         HttpClient client = newHttpClient();
 
-        // Redirects must be proxied as is, not followed
+        // Redirects must be proxied as is, not followed.
         client.setFollowRedirects(false);
 
-        // Must not store cookies, otherwise cookies of different clients will mix
+        // Must not store cookies, otherwise cookies of different clients will mix.
         client.setCookieStore(new HttpCookieStore.Empty());
 
         Executor executor;
@@ -288,8 +321,11 @@ public abstract class AbstractProxyServlet extends HttpServlet
         {
             client.start();
 
-            // Content must not be decoded, otherwise the client gets confused
+            // Content must not be decoded, otherwise the client gets confused.
             client.getContentDecoderFactories().clear();
+
+            // No protocol handlers, pass everything to the client.
+            client.getProtocolHandlers().clear();
 
             return client;
         }
@@ -403,7 +439,7 @@ public abstract class AbstractProxyServlet extends HttpServlet
             String headerName = headerNames.nextElement();
             String lowerHeaderName = headerName.toLowerCase(Locale.ENGLISH);
 
-            if (HttpHeader.HOST.is(headerName))
+            if (HttpHeader.HOST.is(headerName) && !_preserveHost)
                 continue;
 
             // Remove hop-by-hop headers.
@@ -510,7 +546,10 @@ public abstract class AbstractProxyServlet extends HttpServlet
         boolean aborted = proxyRequest.abort(failure);
         if (!aborted)
         {
-            proxyResponse.setStatus(500);
+            int status = failure instanceof TimeoutException ?
+                    HttpStatus.REQUEST_TIMEOUT_408 :
+                    HttpStatus.INTERNAL_SERVER_ERROR_500;
+            proxyResponse.setStatus(status);
             clientRequest.getAsyncContext().complete();
         }
     }
@@ -610,5 +649,74 @@ public abstract class AbstractProxyServlet extends HttpServlet
     protected int getRequestId(HttpServletRequest clientRequest)
     {
         return System.identityHashCode(clientRequest);
+    }
+
+    /**
+     * <p>Utility class that implement transparent proxy functionalities.</p>
+     * <p>Configuration parameters:</p>
+     * <ul>
+     * <li>{@code proxyTo} - a mandatory URI like http://host:80/context to which the request is proxied.</li>
+     * <li>{@code prefix} - an optional URI prefix that is stripped from the start of the forwarded URI.</li>
+     * </ul>
+     * <p>For example, if a request is received at "/foo/bar", the {@code proxyTo} parameter is
+     * "http://host:80/context" and the {@code prefix} parameter is "/foo", then the request would
+     * be proxied to "http://host:80/context/bar".
+     */
+    protected static class TransparentDelegate
+    {
+        private final ProxyServlet proxyServlet;
+        private String _proxyTo;
+        private String _prefix;
+
+        protected TransparentDelegate(ProxyServlet proxyServlet)
+        {
+            this.proxyServlet = proxyServlet;
+        }
+
+        protected void init(ServletConfig config) throws ServletException
+        {
+            _proxyTo = config.getInitParameter("proxyTo");
+            if (_proxyTo == null)
+                throw new UnavailableException("Init parameter 'proxyTo' is required.");
+
+            String prefix = config.getInitParameter("prefix");
+            if (prefix != null)
+            {
+                if (!prefix.startsWith("/"))
+                    throw new UnavailableException("Init parameter 'prefix' must start with a '/'.");
+                _prefix = prefix;
+            }
+
+            // Adjust prefix value to account for context path
+            String contextPath = config.getServletContext().getContextPath();
+            _prefix = _prefix == null ? contextPath : (contextPath + _prefix);
+
+            if (proxyServlet._log.isDebugEnabled())
+                proxyServlet._log.debug(config.getServletName() + " @ " + _prefix + " to " + _proxyTo);
+        }
+
+        protected String rewriteTarget(HttpServletRequest request)
+        {
+            String path = request.getRequestURI();
+            if (!path.startsWith(_prefix))
+                return null;
+
+            StringBuilder uri = new StringBuilder(_proxyTo);
+            if (_proxyTo.endsWith("/"))
+                uri.setLength(uri.length() - 1);
+            String rest = path.substring(_prefix.length());
+            if (!rest.startsWith("/"))
+                uri.append("/");
+            uri.append(rest);
+            String query = request.getQueryString();
+            if (query != null)
+                uri.append("?").append(query);
+            URI rewrittenURI = URI.create(uri.toString()).normalize();
+
+            if (!proxyServlet.validateDestination(rewrittenURI.getHost(), rewrittenURI.getPort()))
+                return null;
+
+            return rewrittenURI.toString();
+        }
     }
 }

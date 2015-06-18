@@ -20,18 +20,15 @@ package org.eclipse.jetty.proxy;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.concurrent.TimeUnit;
+
 import javax.servlet.AsyncContext;
 import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.UnavailableException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentProvider;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.api.Response;
@@ -41,22 +38,11 @@ import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.util.Callback;
 
 /**
- * <p>Proxy servlet based on Servlet 3.0 asynchronous request/response.</p>
- * <p>Forwards requests to another server either as a standard web reverse proxy
- * (as defined by RFC2616) or as a transparent reverse proxy.</p>
- * <p>To facilitate JMX monitoring, the {@link HttpClient} instance is set as
- * context attribute, prefixed with the servlet's name and exposed by the
- * mechanism provided by {@link ServletContext#setAttribute(String, Object)}.</p>
- * <p>The following init parameters may be used to configure the servlet:</p>
- * <ul>
- * <li>hostHeader - forces the host header to a particular value</li>
- * <li>viaHost - the name to use in the Via header: Via: http/1.1 &lt;viaHost&gt;</li>
- * <li>whiteList - comma-separated list of allowed proxy hosts</li>
- * <li>blackList - comma-separated list of forbidden proxy hosts</li>
- * </ul>
- * <p>In addition, see {@link #createHttpClient()} for init parameters used to configure
- * the {@link HttpClient} instance.</p>
+ * <p>Servlet 3.0 asynchronous proxy servlet.</p>
+ * <p>The request processing is asynchronous, but the I/O is blocking.</p>
  *
+ * @see AsyncProxyServlet
+ * @see AsyncMiddleManServlet
  * @see ConnectHandler
  */
 public class ProxyServlet extends AbstractProxyServlet
@@ -128,15 +114,9 @@ public class ProxyServlet extends AbstractProxyServlet
     }
 
     /**
-     * This convenience extension to {@link ProxyServlet} configures the servlet as a transparent proxy.
-     * This servlet is configured with the following init parameters:
-     * <ul>
-     * <li>proxyTo - a mandatory URI like http://host:80/context to which the request is proxied.</li>
-     * <li>prefix - an optional URI prefix that is stripped from the start of the forwarded URI.</li>
-     * </ul>
-     * <p/>
-     * For example, if a request is received at "/foo/bar", the 'proxyTo' parameter is "http://host:80/context"
-     * and the 'prefix' parameter is "/foo", then the request would be proxied to "http://host:80/context/bar".
+     * <p>Convenience extension of {@link ProxyServlet} that offers transparent proxy functionalities.</p>
+     *
+     * @see TransparentDelegate
      */
     public static class Transparent extends ProxyServlet
     {
@@ -153,64 +133,6 @@ public class ProxyServlet extends AbstractProxyServlet
         protected String rewriteTarget(HttpServletRequest request)
         {
             return delegate.rewriteTarget(request);
-        }
-    }
-
-    protected static class TransparentDelegate
-    {
-        private final ProxyServlet proxyServlet;
-        private String _proxyTo;
-        private String _prefix;
-
-        protected TransparentDelegate(ProxyServlet proxyServlet)
-        {
-            this.proxyServlet = proxyServlet;
-        }
-
-        protected void init(ServletConfig config) throws ServletException
-        {
-            _proxyTo = config.getInitParameter("proxyTo");
-            if (_proxyTo == null)
-                throw new UnavailableException("Init parameter 'proxyTo' is required.");
-
-            String prefix = config.getInitParameter("prefix");
-            if (prefix != null)
-            {
-                if (!prefix.startsWith("/"))
-                    throw new UnavailableException("Init parameter 'prefix' must start with a '/'.");
-                _prefix = prefix;
-            }
-
-            // Adjust prefix value to account for context path
-            String contextPath = config.getServletContext().getContextPath();
-            _prefix = _prefix == null ? contextPath : (contextPath + _prefix);
-
-            if (proxyServlet._log.isDebugEnabled())
-                proxyServlet._log.debug(config.getServletName() + " @ " + _prefix + " to " + _proxyTo);
-        }
-
-        protected String rewriteTarget(HttpServletRequest request)
-        {
-            String path = request.getRequestURI();
-            if (!path.startsWith(_prefix))
-                return null;
-
-            StringBuilder uri = new StringBuilder(_proxyTo);
-            if (_proxyTo.endsWith("/"))
-                uri.setLength(uri.length() - 1);
-            String rest = path.substring(_prefix.length());
-            if (!rest.startsWith("/"))
-                uri.append("/");
-            uri.append(rest);
-            String query = request.getQueryString();
-            if (query != null)
-                uri.append("?").append(query);
-            URI rewrittenURI = URI.create(uri.toString()).normalize();
-
-            if (!proxyServlet.validateDestination(rewrittenURI.getHost(), rewrittenURI.getPort()))
-                return null;
-
-            return rewrittenURI.toString();
         }
     }
 

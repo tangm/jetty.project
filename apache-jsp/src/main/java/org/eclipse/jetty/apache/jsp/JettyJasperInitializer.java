@@ -36,7 +36,6 @@ import org.xml.sax.SAXException;
 
 /**
  * JettyJasperInitializer
- *
  */
 public class JettyJasperInitializer extends JasperInitializer
 {
@@ -92,8 +91,6 @@ public class JettyJasperInitializer extends JasperInitializer
     /**
      * Make a TldScanner, and prefeed it the tlds that have already been discovered in jar files
      * by the MetaInfConfiguration.
-     * 
-     * @see org.apache.jasper.servlet.JasperInitializer#prepareScanner(javax.servlet.ServletContext, boolean, boolean, boolean)
      */
     @Override
     public TldScanner newTldScanner(ServletContext context, boolean namespaceAware, boolean validate, boolean blockExternal)

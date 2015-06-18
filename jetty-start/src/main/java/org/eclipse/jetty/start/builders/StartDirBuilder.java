@@ -42,52 +42,60 @@ public class StartDirBuilder implements BaseBuilder.Config
 {
     private final BaseHome baseHome;
     private final Path startDir;
-    
+
     public StartDirBuilder(BaseBuilder baseBuilder) throws IOException
     {
         this.baseHome = baseBuilder.getBaseHome();
         this.startDir = baseHome.getBasePath("start.d");
         FS.ensureDirectoryExists(startDir);
     }
-    
+
     @Override
     public boolean addModule(Module module) throws IOException
     {
-        if (module.isVirtual())
+        if (module.isDynamic())
         {
-            // skip, no need to reference
-            StartLog.info("%-15s skipping (virtual module)",module.getName());
+            if (module.hasIniTemplate())
+            {
+                // warn
+                StartLog.warn("%-15s not adding [ini-template] from dynamic module",module.getName());
+            }
             return false;
         }
-        
+
         String mode = "";
-        if (module.matches(OnlyTransitivePredicate.INSTANCE))
+        boolean isTransitive = module.matches(OnlyTransitivePredicate.INSTANCE);
+        if (isTransitive)
         {
             mode = "(transitively) ";
         }
-        
-        // Create start.d/{name}.ini
-        Path ini = startDir.resolve(module.getName() + ".ini");
-        StartLog.info("%-15s initialised %sin %s",module.getName(),mode,baseHome.toShortForm(ini));
-        
-        try (BufferedWriter writer = Files.newBufferedWriter(ini,StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING))
+
+        if (module.hasIniTemplate() || !isTransitive)
         {
-            writeModuleSection(writer,module);
+            // Create start.d/{name}.ini
+            Path ini = startDir.resolve(module.getName() + ".ini");
+            StartLog.info("%-15s initialised %sin %s",module.getName(),mode,baseHome.toShortForm(ini));
+
+            try (BufferedWriter writer = Files.newBufferedWriter(ini,StandardCharsets.UTF_8,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING))
+            {
+                writeModuleSection(writer,module);
+            }
+            return true;
         }
 
-        return true;
+        return false;
     }
-    
+
     protected void writeModuleSection(BufferedWriter writer, Module module)
     {
         PrintWriter out = new PrintWriter(writer);
 
         out.println("# --------------------------------------- ");
         out.println("# Module: " + module.getName());
-
         out.println("--module=" + module.getName());
+        out.println();
 
-        for (String line : module.getDefaultConfig())
+        for (String line : module.getIniTemplate())
         {
             out.println(line);
         }

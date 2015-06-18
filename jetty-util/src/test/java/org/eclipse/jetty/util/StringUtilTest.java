@@ -232,13 +232,19 @@ public class StringUtilTest
     }
     
     @Test
+    public void testSanitizeHTML()
+    {
+        assertEquals(null,StringUtil.sanitizeXmlString(null));
+        assertEquals("",StringUtil.sanitizeXmlString(""));
+        assertEquals("&lt;&amp;&gt;",StringUtil.sanitizeXmlString("<&>"));
+        assertEquals("Hello &lt;Cruel&gt; World",StringUtil.sanitizeXmlString("Hello <Cruel> World"));
+        assertEquals("Hello ? World",StringUtil.sanitizeXmlString("Hello \u0000 World"));
+    }    
+    
+    @Test
     public void testSplit()
     {
         String[] array;
-        
-        array=StringUtil.split(null);
-        Assert.assertNull(array);
-        
         array=StringUtil.split("");
         Assert.assertEquals(0,array.length);
         

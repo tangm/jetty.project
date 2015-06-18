@@ -20,35 +20,39 @@ package org.eclipse.jetty.util;
 
 import java.nio.channels.ClosedChannelException;
 
-import org.eclipse.jetty.util.thread.SpinLock;
+import org.eclipse.jetty.util.thread.Locker;
 
 /**
  * This specialized callback implements a pattern that allows
  * a large job to be broken into smaller tasks using iteration
  * rather than recursion.
- * <p/>
+ * <p>
  * A typical example is the write of a large content to a socket,
  * divided in chunks. Chunk C1 is written by thread T1, which
  * also invokes the callback, which writes chunk C2, which invokes
  * the callback again, which writes chunk C3, and so forth.
- * <p/>
+ * </p>
+ * <p>
  * The problem with the example is that if the callback thread
  * is the same that performs the I/O operation, then the process
  * is recursive and may result in a stack overflow.
  * To avoid the stack overflow, a thread dispatch must be performed,
  * causing context switching and cache misses, affecting performance.
- * <p/>
+ * </p>
+ * <p>
  * To avoid this issue, this callback uses an AtomicReference to
  * record whether success callback has been called during the processing
  * of a sub task, and if so then the processing iterates rather than
  * recurring.
- * <p/>
+ * </p>
+ * <p>
  * Subclasses must implement method {@link #process()} where the sub
  * task is executed and a suitable {@link IteratingCallback.Action} is
  * returned to this callback to indicate the overall progress of the job.
  * This callback is passed to the asynchronous execution of each sub
  * task and a call the {@link #succeeded()} on this callback represents
  * the completion of the sub task.
+ * </p>
  */
 public abstract class IteratingCallback implements Callback
 {
@@ -68,31 +72,31 @@ public abstract class IteratingCallback implements Callback
          * and set iterating to true.
          */
         PROCESSING,
-        
+
         /**
          * Waiting for a schedule callback
          */
         PENDING,
-        
+
         /**
          * Called by a schedule callback
          */
         CALLED,
-        
+
         /**
-         * The overall job has succeeded as indicated by a {@link Action#SUCCEEDED} return 
+         * The overall job has succeeded as indicated by a {@link Action#SUCCEEDED} return
          * from {@link IteratingCallback#process()}
          */
         SUCCEEDED,
-        
+
         /**
          * The overall job has failed as indicated by a call to {@link IteratingCallback#failed(Throwable)}
          */
         FAILED,
-        
+
         /**
          * This callback has been closed and cannot be reset.
-         */ 
+         */
         CLOSED
     }
 
@@ -114,33 +118,34 @@ public abstract class IteratingCallback implements Callback
          * may have not yet been invoked.
          */
         SCHEDULED,
-        
+
         /**
          * Indicates that {@link #process()} has completed the overall job.
          */
         SUCCEEDED
     }
 
-    private SpinLock _lock = new SpinLock();
+    private Locker _locker = new Locker();
     private State _state;
     private boolean _iterate;
-    
-    
+
+
     protected IteratingCallback()
     {
         _state = State.IDLE;
     }
-    
+
     protected IteratingCallback(boolean needReset)
     {
         _state = needReset ? State.SUCCEEDED : State.IDLE;
     }
-    
+
     /**
      * Method called by {@link #iterate()} to process the sub task.
-     * <p/>
+     * <p>
      * Implementations must start the asynchronous execution of the sub task
      * (if any) and return an appropriate action:
+     * </p>
      * <ul>
      * <li>{@link Action#IDLE} when no sub tasks are available for execution
      * but the overall job is not completed yet</li>
@@ -148,6 +153,8 @@ public abstract class IteratingCallback implements Callback
      * has been started</li>
      * <li>{@link Action#SUCCEEDED} when the overall job is completed</li>
      * </ul>
+     *
+     * @return the appropriate Action
      *
      * @throws Exception if the sub task processing throws
      */
@@ -161,21 +168,22 @@ public abstract class IteratingCallback implements Callback
     protected void onCompleteSuccess()
     {
     }
-    
+
     /**
      * Invoked when the overall task has completed with a failure.
+     * @param cause the throwable to indicate cause of failure
      *
      * @see #onCompleteSuccess()
      */
-    protected void onCompleteFailure(Throwable x)
+    protected void onCompleteFailure(Throwable cause)
     {
     }
 
     /**
      * This method must be invoked by applications to start the processing
-     * of sub tasks.  It can be called at any time by any thread, and it's 
+     * of sub tasks.  It can be called at any time by any thread, and it's
      * contract is that when called, then the {@link #process()} method will
-     * be called during or soon after, either by the calling thread or by 
+     * be called during or soon after, either by the calling thread or by
      * another thread.
      */
     public void iterate()
@@ -184,7 +192,7 @@ public abstract class IteratingCallback implements Callback
 
         loop: while (true)
         {
-            try (SpinLock.Lock lock = _lock.lock())
+            try (Locker.Lock lock = _locker.lock())
             {
                 switch (_state)
                 {
@@ -198,7 +206,7 @@ public abstract class IteratingCallback implements Callback
                         process=true;
                         break loop;
 
-                    case PROCESSING:                        
+                    case PROCESSING:
                         _iterate=true;
                         break loop;
 
@@ -216,13 +224,13 @@ public abstract class IteratingCallback implements Callback
             processing();
     }
 
-    private void processing() 
+    private void processing()
     {
         // This should only ever be called when in processing state, however a failed or close call
         // may happen concurrently, so state is not assumed.
-        
+
         boolean on_complete_success=false;
-        
+
         // While we are processing
         processing: while (true)
         {
@@ -239,7 +247,7 @@ public abstract class IteratingCallback implements Callback
             }
 
             // acted on the action we have just received
-            try(SpinLock.Lock lock = _lock.lock())
+            try(Locker.Lock lock = _locker.lock())
             {
                 switch (_state)
                 {
@@ -264,7 +272,7 @@ public abstract class IteratingCallback implements Callback
                             }
 
                             case SCHEDULED:
-                            {                                    
+                            {
                                 // we won the race against the callback, so the callback has to process and we can break processing
                                 _state=State.PENDING;
                                 break processing;
@@ -272,7 +280,7 @@ public abstract class IteratingCallback implements Callback
 
                             case SUCCEEDED:
                             {
-                                // we lost the race against the callback, 
+                                // we lost the race against the callback,
                                 _iterate=false;
                                 _state=State.SUCCEEDED;
                                 on_complete_success=true;
@@ -280,7 +288,7 @@ public abstract class IteratingCallback implements Callback
                             }
 
                             default:
-                                throw new IllegalStateException("state="+_state+" action="+action); 
+                                throw new IllegalStateException("state="+_state+" action="+action);
                         }
                     }
 
@@ -289,14 +297,14 @@ public abstract class IteratingCallback implements Callback
                         switch (action)
                         {
                             case SCHEDULED:
-                            {                       
+                            {
                                 // we lost the race, so we have to keep processing
                                 _state=State.PROCESSING;
                                 continue processing;
                             }
 
                             default:
-                                throw new IllegalStateException("state="+_state+" action="+action); 
+                                throw new IllegalStateException("state="+_state+" action="+action);
                         }
                     }
 
@@ -308,7 +316,7 @@ public abstract class IteratingCallback implements Callback
                     case IDLE:
                     case PENDING:
                     default:
-                        throw new IllegalStateException("state="+_state+" action="+action); 
+                        throw new IllegalStateException("state="+_state+" action="+action);
                 }
             }
         }
@@ -326,7 +334,7 @@ public abstract class IteratingCallback implements Callback
     public void succeeded()
     {
         boolean process=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             switch (_state)
             {
@@ -346,7 +354,7 @@ public abstract class IteratingCallback implements Callback
                 {
                     // Too late!
                     break;
-                }    
+                }
                 default:
                 {
                     throw new IllegalStateException("state="+_state);
@@ -366,7 +374,7 @@ public abstract class IteratingCallback implements Callback
     public void failed(Throwable x)
     {
         boolean failure=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             switch (_state)
             {
@@ -377,9 +385,9 @@ public abstract class IteratingCallback implements Callback
                 case CALLED:
                     // too late!.
                     break;
-                    
-                case PENDING: 
-                case PROCESSING: 
+
+                case PENDING:
+                case PROCESSING:
                 {
                     _state=State.FAILED;
                     failure=true;
@@ -396,14 +404,13 @@ public abstract class IteratingCallback implements Callback
     public void close()
     {
         boolean failure=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             switch (_state)
             {
                 case IDLE:
                 case SUCCEEDED:
                 case FAILED:
-                case PROCESSING:
                     _state=State.CLOSED;
                     break;
 
@@ -426,7 +433,7 @@ public abstract class IteratingCallback implements Callback
      */
     boolean isIdle()
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             return _state == State.IDLE;
         }
@@ -434,18 +441,18 @@ public abstract class IteratingCallback implements Callback
 
     public boolean isClosed()
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             return _state == State.CLOSED;
         }
     }
-    
+
     /**
      * @return whether this callback has failed
      */
     public boolean isFailed()
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             return _state == State.FAILED;
         }
@@ -456,7 +463,7 @@ public abstract class IteratingCallback implements Callback
      */
     public boolean isSucceeded()
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             return _state == State.SUCCEEDED;
         }
@@ -464,15 +471,16 @@ public abstract class IteratingCallback implements Callback
 
     /**
      * Resets this callback.
-     * <p/>
+     * <p>
      * A callback can only be reset to IDLE from the
      * SUCCEEDED or FAILED states or if it is already IDLE.
+     * </p>
      *
      * @return true if the reset was successful
      */
     public boolean reset()
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             switch(_state)
             {
@@ -484,13 +492,13 @@ public abstract class IteratingCallback implements Callback
                     _iterate=false;
                     _state=State.IDLE;
                     return true;
-                    
+
                 default:
                     return false;
             }
         }
     }
-    
+
     @Override
     public String toString()
     {

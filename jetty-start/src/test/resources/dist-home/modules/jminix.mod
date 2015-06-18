@@ -36,6 +36,6 @@ https://code.google.com/p/jminix/
 http://www.apache.org/licenses/LICENSE-2.0
 
 [ini-template]
-# Jminix Configuration
+## Jminix Configuration
 jminix.port=8088
 

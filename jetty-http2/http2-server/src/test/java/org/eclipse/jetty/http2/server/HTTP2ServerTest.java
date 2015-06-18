@@ -30,7 +30,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -49,10 +48,12 @@ import org.eclipse.jetty.http2.parser.Parser;
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.io.ManagedSelector;
 import org.eclipse.jetty.io.SelectChannelEndPoint;
+import org.eclipse.jetty.server.HttpChannel;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.Callback;
+import org.eclipse.jetty.util.log.StdErrLog;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -346,6 +347,47 @@ public class HTTP2ServerTest extends AbstractServerTest
             Parser parser = new Parser(byteBufferPool, new Parser.Listener.Adapter(), 4096, 8192);
             boolean closed = parseResponse(client, parser, 2 * delay);
             Assert.assertTrue(closed);
+        }
+    }
+
+    @Test
+    public void testNonISOHeader() throws Exception
+    {
+        StdErrLog logger = StdErrLog.getLogger(HttpChannel.class);
+        logger.setHideStacks(true);
+        try
+        {
+            startServer(new HttpServlet()
+            {
+                @Override
+                protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
+                {
+                    // Invalid header name, the connection must be closed.
+                    response.setHeader("Euro_(\u20AC)", "42");
+                }
+            });
+
+            ByteBufferPool.Lease lease = new ByteBufferPool.Lease(byteBufferPool);
+            generator.control(lease, new PrefaceFrame());
+            MetaData.Request metaData = newRequest("GET", new HttpFields());
+            generator.control(lease, new HeadersFrame(1, metaData, null, true));
+
+            try (Socket client = new Socket("localhost", connector.getLocalPort()))
+            {
+                OutputStream output = client.getOutputStream();
+                for (ByteBuffer buffer : lease.getByteBuffers())
+                    output.write(BufferUtil.toArray(buffer));
+                output.flush();
+
+                Parser parser = new Parser(byteBufferPool, new Parser.Listener.Adapter(), 4096, 8192);
+                boolean closed = parseResponse(client, parser);
+
+                Assert.assertTrue(closed);
+            }
+        }
+        finally
+        {
+            logger.setHideStacks(false);
         }
     }
 }

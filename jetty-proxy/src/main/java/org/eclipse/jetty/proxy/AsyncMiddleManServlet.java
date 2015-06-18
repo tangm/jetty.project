@@ -31,6 +31,7 @@ import java.util.zip.GZIPOutputStream;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.ReadListener;
+import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletInputStream;
 import javax.servlet.ServletOutputStream;
@@ -54,9 +55,18 @@ import org.eclipse.jetty.util.CountingCallback;
 import org.eclipse.jetty.util.IteratingCallback;
 import org.eclipse.jetty.util.component.Destroyable;
 
-@SuppressWarnings("serial")
+/**
+ * <p>Servlet 3.1 asynchronous proxy servlet with capability
+ * to intercept and modify request/response content.</p>
+ * <p>Both the request processing and the I/O are asynchronous.</p>
+ *
+ * @see ProxyServlet
+ * @see AsyncProxyServlet
+ * @see ConnectHandler
+ */
 public class AsyncMiddleManServlet extends AbstractProxyServlet
 {
+    private static final String PROXY_REQUEST_COMMITTED = AsyncMiddleManServlet.class.getName() + ".proxyRequestCommitted";
     private static final String CLIENT_TRANSFORMER = AsyncMiddleManServlet.class.getName() + ".clientTransformer";
     private static final String SERVER_TRANSFORMER = AsyncMiddleManServlet.class.getName() + ".serverTransformer";
 
@@ -194,6 +204,29 @@ public class AsyncMiddleManServlet extends AbstractProxyServlet
             ((Destroyable)serverTransformer).destroy();
     }
 
+    /**
+     * <p>Convenience extension of {@link AsyncMiddleManServlet} that offers transparent proxy functionalities.</p>
+     *
+     * @see TransparentDelegate
+     */
+    public static class Transparent extends ProxyServlet
+    {
+        private final TransparentDelegate delegate = new TransparentDelegate(this);
+
+        @Override
+        public void init(ServletConfig config) throws ServletException
+        {
+            super.init(config);
+            delegate.init(config);
+        }
+
+        @Override
+        protected String rewriteTarget(HttpServletRequest request)
+        {
+            return delegate.rewriteTarget(request);
+        }
+    }
+
     protected class ProxyReader extends IteratingCallback implements ReadListener
     {
         private final byte[] buffer = new byte[getHttpClient().getRequestBufferSize()];
@@ -253,13 +286,13 @@ public class AsyncMiddleManServlet extends AbstractProxyServlet
             while (input.isReady() && !input.isFinished())
             {
                 int read = readClientRequestContent(input, buffer);
-                
+
                 if (_log.isDebugEnabled())
                     _log.debug("{} asynchronous read {} bytes on {}", getRequestId(clientRequest), read, input);
 
-                if (read<0)
+                if (read < 0)
                     return Action.SUCCEEDED;
-                
+
                 if (contentLength > 0 && read > 0)
                     length += read;
 
@@ -288,20 +321,23 @@ public class AsyncMiddleManServlet extends AbstractProxyServlet
         private void process(ByteBuffer content, Callback callback, boolean finished) throws IOException
         {
             ContentTransformer transformer = (ContentTransformer)clientRequest.getAttribute(CLIENT_TRANSFORMER);
-            boolean committed = transformer != null;
             if (transformer == null)
             {
                 transformer = newClientRequestContentTransformer(clientRequest, proxyRequest);
                 clientRequest.setAttribute(CLIENT_TRANSFORMER, transformer);
             }
 
-            if (!content.hasRemaining() && !finished)
+            boolean committed = clientRequest.getAttribute(PROXY_REQUEST_COMMITTED) != null;
+
+            int contentBytes = content.remaining();
+
+            // Skip transformation for empty non-last buffers.
+            if (contentBytes == 0 && !finished)
             {
                 callback.succeeded();
                 return;
             }
 
-            int contentBytes = content.remaining();
             transform(transformer, content, finished, buffers);
 
             int newContentBytes = 0;
@@ -324,14 +360,15 @@ public class AsyncMiddleManServlet extends AbstractProxyServlet
             if (_log.isDebugEnabled())
                 _log.debug("{} upstream content transformation {} -> {} bytes", getRequestId(clientRequest), contentBytes, newContentBytes);
 
-            if (!committed)
+            if (!committed && (size > 0 || finished))
             {
                 proxyRequest.header(HttpHeader.CONTENT_LENGTH, null);
+                clientRequest.setAttribute(PROXY_REQUEST_COMMITTED, true);
                 sendProxyRequest(clientRequest, proxyResponse, proxyRequest);
             }
 
             if (size == 0)
-                succeeded();
+                callback.succeeded();
         }
 
         @Override
@@ -401,7 +438,7 @@ public class AsyncMiddleManServlet extends AbstractProxyServlet
 
                 length += contentBytes;
 
-                boolean finished = contentLength > 0 && length == contentLength;
+                boolean finished = contentLength >= 0 && length == contentLength;
                 transform(transformer, content, finished, buffers);
 
                 int newContentBytes = 0;
@@ -433,7 +470,7 @@ public class AsyncMiddleManServlet extends AbstractProxyServlet
                 }
                 else
                 {
-                    if (contentLength > 0)
+                    if (contentLength >= 0)
                         proxyResponse.setContentLength(-1);
 
                     // Setting the WriteListener triggers an invocation to
@@ -648,19 +685,19 @@ public class AsyncMiddleManServlet extends AbstractProxyServlet
          * <p>Typical implementations:</p>
          * <pre>
          * // Identity transformation (no transformation, the input is copied to the output)
-         * public void transform(ByteBuffer input, boolean finished, List<ByteBuffer> output)
+         * public void transform(ByteBuffer input, boolean finished, List&lt;ByteBuffer&gt; output)
          * {
          *     output.add(input);
          * }
          *
          * // Discard transformation (all input is discarded)
-         * public void transform(ByteBuffer input, boolean finished, List<ByteBuffer> output)
+         * public void transform(ByteBuffer input, boolean finished, List&lt;ByteBuffer&gt; output)
          * {
          *     // Empty
          * }
          *
          * // Buffering identity transformation (all input is buffered aside until it is finished)
-         * public void transform(ByteBuffer input, boolean finished, List<ByteBuffer> output)
+         * public void transform(ByteBuffer input, boolean finished, List&lt;ByteBuffer&gt; output)
          * {
          *     ByteBuffer copy = ByteBuffer.allocate(input.remaining());
          *     copy.put(input).flip();
@@ -750,5 +787,4 @@ public class AsyncMiddleManServlet extends AbstractProxyServlet
             return ByteBuffer.wrap(gzipBytes);
         }
     }
-
 }

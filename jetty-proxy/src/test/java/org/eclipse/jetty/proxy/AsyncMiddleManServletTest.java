@@ -18,43 +18,9 @@
 
 package org.eclipse.jetty.proxy;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
-import javax.servlet.ServletException;
-import javax.servlet.ServletInputStream;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.HttpProxy;
-import org.eclipse.jetty.client.api.ContentProvider;
-import org.eclipse.jetty.client.api.ContentResponse;
-import org.eclipse.jetty.client.api.Request;
-import org.eclipse.jetty.client.api.Response;
-import org.eclipse.jetty.client.api.Result;
+import org.eclipse.jetty.client.api.*;
 import org.eclipse.jetty.client.util.BytesContentProvider;
 import org.eclipse.jetty.client.util.DeferredContentProvider;
 import org.eclipse.jetty.client.util.FutureResponseListener;
@@ -76,11 +42,33 @@ import org.eclipse.jetty.util.Utf8StringBuilder;
 import org.eclipse.jetty.util.ajax.JSON;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
+import org.eclipse.jetty.util.log.StdErrLog;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+
+import javax.servlet.ServletException;
+import javax.servlet.ServletInputStream;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class AsyncMiddleManServletTest
 {
@@ -108,12 +96,12 @@ public class AsyncMiddleManServletTest
         server.start();
     }
 
-    private void startProxy(HttpServlet proxyServlet) throws Exception
+    private void startProxy(AsyncMiddleManServlet proxyServlet) throws Exception
     {
         startProxy(proxyServlet, new HashMap<String, String>());
     }
 
-    private void startProxy(HttpServlet proxyServlet, Map<String, String> initParams) throws Exception
+    private void startProxy(AsyncMiddleManServlet proxyServlet, Map<String, String> initParams) throws Exception
     {
         QueuedThreadPool proxyPool = new QueuedThreadPool();
         proxyPool.setName("proxy");
@@ -134,6 +122,8 @@ public class AsyncMiddleManServletTest
         proxyContext.addServlet(proxyServletHolder, "/*");
 
         proxy.start();
+
+        ((StdErrLog)proxyServlet._log).setHideStacks(true);
     }
 
     private void startClient() throws Exception
@@ -893,7 +883,7 @@ public class AsyncMiddleManServletTest
                 return new AfterContentTransformer()
                 {
                     @Override
-                    public void transform(Source source, Sink sink) throws IOException
+                    public boolean transform(Source source, Sink sink) throws IOException
                     {
                         InputStream input = source.getInputStream();
                         @SuppressWarnings("unchecked")
@@ -903,6 +893,7 @@ public class AsyncMiddleManServletTest
                         try (OutputStream output = sink.getOutputStream())
                         {
                             output.write(JSON.toString(obj).getBytes(StandardCharsets.UTF_8));
+                            return true;
                         }
                     }
                 };
@@ -963,7 +954,7 @@ public class AsyncMiddleManServletTest
                     }
 
                     @Override
-                    public void transform(Source source, Sink sink) throws IOException
+                    public boolean transform(Source source, Sink sink) throws IOException
                     {
                         // Consume the stream once.
                         InputStream input = source.getInputStream();
@@ -972,6 +963,7 @@ public class AsyncMiddleManServletTest
                         // Reset the stream and re-read it.
                         input.reset();
                         IO.copy(input, sink.getOutputStream());
+                        return true;
                     }
                 };
             }
@@ -1016,7 +1008,7 @@ public class AsyncMiddleManServletTest
                 AfterContentTransformer transformer = new AfterContentTransformer()
                 {
                     @Override
-                    public void transform(Source source, Sink sink) throws IOException
+                    public boolean transform(Source source, Sink sink) throws IOException
                     {
                         InputStream input = source.getInputStream();
                         @SuppressWarnings("unchecked")
@@ -1026,6 +1018,7 @@ public class AsyncMiddleManServletTest
                         try (OutputStream output = sink.getOutputStream())
                         {
                             output.write(JSON.toString(obj).getBytes(StandardCharsets.UTF_8));
+                            return true;
                         }
                     }
                 };
@@ -1090,9 +1083,10 @@ public class AsyncMiddleManServletTest
                     }
 
                     @Override
-                    public void transform(Source source, Sink sink) throws IOException
+                    public boolean transform(Source source, Sink sink) throws IOException
                     {
                         IO.copy(source.getInputStream(), sink.getOutputStream());
+                        return true;
                     }
 
                     @Override
@@ -1124,7 +1118,7 @@ public class AsyncMiddleManServletTest
                 .send();
 
         Assert.assertTrue(destroyLatch.await(5 * idleTimeout, TimeUnit.MILLISECONDS));
-        Assert.assertEquals(HttpStatus.GATEWAY_TIMEOUT_504, response.getStatus());
+        Assert.assertEquals(HttpStatus.REQUEST_TIMEOUT_408, response.getStatus());
     }
 
     @Test
@@ -1162,9 +1156,10 @@ public class AsyncMiddleManServletTest
                     }
 
                     @Override
-                    public void transform(Source source, Sink sink) throws IOException
+                    public boolean transform(Source source, Sink sink) throws IOException
                     {
                         IO.copy(source.getInputStream(), sink.getOutputStream());
+                        return true;
                     }
 
                     @Override
@@ -1185,6 +1180,279 @@ public class AsyncMiddleManServletTest
         Assert.assertTrue(serviceLatch.await(5, TimeUnit.SECONDS));
         Assert.assertTrue(destroyLatch.await(5, TimeUnit.SECONDS));
         Assert.assertEquals(HttpStatus.BAD_GATEWAY_502, response.getStatus());
+    }
+
+    @Test
+    public void testAfterContentTransformerDoNotReadSourceDoNotTransform() throws Exception
+    {
+        testAfterContentTransformerDoNoTransform(false, false);
+    }
+
+    @Test
+    public void testAfterContentTransformerReadSourceDoNotTransform() throws Exception
+    {
+        testAfterContentTransformerDoNoTransform(true, true);
+    }
+
+    private void testAfterContentTransformerDoNoTransform(final boolean readSource, final boolean useDisk) throws Exception
+    {
+        final String key0 = "id";
+        long value0 = 1;
+        final String key1 = "channel";
+        String value1 = "foo";
+        final String json = "{ \"" + key0 + "\":" + value0 + ", \"" + key1 + "\":\"" + value1 + "\" }";
+        startServer(new HttpServlet()
+        {
+            @Override
+            protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
+            {
+                response.getOutputStream().write(json.getBytes(StandardCharsets.UTF_8));
+            }
+        });
+        startProxy(new AsyncMiddleManServlet()
+        {
+            @Override
+            protected ContentTransformer newServerResponseContentTransformer(HttpServletRequest clientRequest, HttpServletResponse proxyResponse, Response serverResponse)
+            {
+                return new AfterContentTransformer()
+                {
+                    {
+                        if (useDisk)
+                            setMaxInputBufferSize(0);
+                    }
+
+                    @Override
+                    public boolean transform(Source source, Sink sink) throws IOException
+                    {
+                        if (readSource)
+                        {
+                            InputStream input = source.getInputStream();
+                            JSON.parse(new InputStreamReader(input, "UTF-8"));
+                        }
+                        // No transformation.
+                        return false;
+                    }
+                };
+            }
+        });
+        startClient();
+
+        ContentResponse response = client.newRequest("localhost", serverConnector.getLocalPort())
+                .timeout(5, TimeUnit.SECONDS)
+                .send();
+
+        Assert.assertEquals(200, response.getStatus());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> obj = (Map<String, Object>)JSON.parse(response.getContentAsString());
+        Assert.assertNotNull(obj);
+        Assert.assertEquals(2, obj.size());
+        Assert.assertEquals(value0, obj.get(key0));
+        Assert.assertEquals(value1, obj.get(key1));
+    }
+
+    @Test
+    public void testServer401() throws Exception
+    {
+        startServer(new HttpServlet()
+        {
+            @Override
+            protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException
+            {
+                response.setStatus(HttpStatus.UNAUTHORIZED_401);
+                response.setHeader(HttpHeader.WWW_AUTHENTICATE.asString(), "Basic realm=\"test\"");
+            }
+        });
+        final AtomicBoolean transformed = new AtomicBoolean();
+        startProxy(new AsyncMiddleManServlet()
+        {
+            @Override
+            protected ContentTransformer newServerResponseContentTransformer(HttpServletRequest clientRequest, HttpServletResponse proxyResponse, Response serverResponse)
+            {
+                return new AfterContentTransformer()
+                {
+                    @Override
+                    public boolean transform(Source source, Sink sink) throws IOException
+                    {
+                        transformed.set(true);
+                        return false;
+                    }
+                };
+            }
+        });
+        startClient();
+
+        ContentResponse response = client.newRequest("localhost", serverConnector.getLocalPort())
+                .timeout(5, TimeUnit.SECONDS)
+                .send();
+
+        Assert.assertEquals(HttpStatus.UNAUTHORIZED_401, response.getStatus());
+        Assert.assertFalse(transformed.get());
+    }
+
+    @Test
+    public void testProxyRequestHeadersSentWhenDiscardingContent() throws Exception
+    {
+        startServer(new EchoHttpServlet());
+        final CountDownLatch proxyRequestLatch = new CountDownLatch(1);
+        startProxy(new AsyncMiddleManServlet()
+        {
+            @Override
+            protected ContentTransformer newClientRequestContentTransformer(HttpServletRequest clientRequest, Request proxyRequest)
+            {
+                return new DiscardContentTransformer();
+            }
+
+            @Override
+            protected void sendProxyRequest(HttpServletRequest clientRequest, HttpServletResponse proxyResponse, Request proxyRequest)
+            {
+                proxyRequestLatch.countDown();
+                super.sendProxyRequest(clientRequest, proxyResponse, proxyRequest);
+            }
+        });
+        startClient();
+
+        DeferredContentProvider content = new DeferredContentProvider();
+        Request request = client.newRequest("localhost", serverConnector.getLocalPort())
+                .timeout(5, TimeUnit.SECONDS)
+                .content(content);
+        FutureResponseListener listener = new FutureResponseListener(request);
+        request.send(listener);
+
+        // Send one chunk of content, the proxy request must not be sent.
+        ByteBuffer chunk1 = ByteBuffer.allocate(1024);
+        content.offer(chunk1);
+        Assert.assertFalse(proxyRequestLatch.await(1, TimeUnit.SECONDS));
+
+        // Send another chunk of content, the proxy request must not be sent.
+        ByteBuffer chunk2 = ByteBuffer.allocate(512);
+        content.offer(chunk2);
+        Assert.assertFalse(proxyRequestLatch.await(1, TimeUnit.SECONDS));
+
+        // Finish the content, request must be sent.
+        content.close();
+        Assert.assertTrue(proxyRequestLatch.await(1, TimeUnit.SECONDS));
+
+        ContentResponse response = listener.get(5, TimeUnit.SECONDS);
+        Assert.assertEquals(HttpStatus.OK_200, response.getStatus());
+        Assert.assertEquals(0, response.getContent().length);
+    }
+
+    @Test
+    public void testProxyRequestHeadersNotSentUntilContent() throws Exception
+    {
+        startServer(new EchoHttpServlet());
+        final CountDownLatch proxyRequestLatch = new CountDownLatch(1);
+        startProxy(new AsyncMiddleManServlet()
+        {
+            @Override
+            protected ContentTransformer newClientRequestContentTransformer(HttpServletRequest clientRequest, Request proxyRequest)
+            {
+                return new BufferingContentTransformer();
+            }
+
+            @Override
+            protected void sendProxyRequest(HttpServletRequest clientRequest, HttpServletResponse proxyResponse, Request proxyRequest)
+            {
+                proxyRequestLatch.countDown();
+                super.sendProxyRequest(clientRequest, proxyResponse, proxyRequest);
+            }
+        });
+        startClient();
+
+        DeferredContentProvider content = new DeferredContentProvider();
+        Request request = client.newRequest("localhost", serverConnector.getLocalPort())
+                .timeout(5, TimeUnit.SECONDS)
+                .content(content);
+        FutureResponseListener listener = new FutureResponseListener(request);
+        request.send(listener);
+
+        // Send one chunk of content, the proxy request must not be sent.
+        ByteBuffer chunk1 = ByteBuffer.allocate(1024);
+        content.offer(chunk1);
+        Assert.assertFalse(proxyRequestLatch.await(1, TimeUnit.SECONDS));
+
+        // Send another chunk of content, the proxy request must not be sent.
+        ByteBuffer chunk2 = ByteBuffer.allocate(512);
+        content.offer(chunk2);
+        Assert.assertFalse(proxyRequestLatch.await(1, TimeUnit.SECONDS));
+
+        // Finish the content, request must be sent.
+        content.close();
+        Assert.assertTrue(proxyRequestLatch.await(1, TimeUnit.SECONDS));
+
+        ContentResponse response = listener.get(5, TimeUnit.SECONDS);
+        Assert.assertEquals(HttpStatus.OK_200, response.getStatus());
+        Assert.assertEquals(chunk1.capacity() + chunk2.capacity(), response.getContent().length);
+    }
+
+    @Test
+    public void testProxyRequestHeadersNotSentUntilFirstContent() throws Exception
+    {
+        startServer(new EchoHttpServlet());
+        final CountDownLatch proxyRequestLatch = new CountDownLatch(1);
+        startProxy(new AsyncMiddleManServlet()
+        {
+            @Override
+            protected ContentTransformer newClientRequestContentTransformer(HttpServletRequest clientRequest, Request proxyRequest)
+            {
+                return new ContentTransformer()
+                {
+                    private ByteBuffer buffer;
+
+                    @Override
+                    public void transform(ByteBuffer input, boolean finished, List<ByteBuffer> output) throws IOException
+                    {
+                        // Buffer only the first chunk.
+                        if (buffer == null)
+                        {
+                            buffer = ByteBuffer.allocate(input.remaining());
+                            buffer.put(input).flip();
+                        }
+                        else if (buffer.hasRemaining())
+                        {
+                            output.add(buffer);
+                            output.add(input);
+                        }
+                        else
+                        {
+                            output.add(input);
+                        }
+                    }
+                };
+            }
+
+            @Override
+            protected void sendProxyRequest(HttpServletRequest clientRequest, HttpServletResponse proxyResponse, Request proxyRequest)
+            {
+                proxyRequestLatch.countDown();
+                super.sendProxyRequest(clientRequest, proxyResponse, proxyRequest);
+            }
+        });
+        startClient();
+
+        DeferredContentProvider content = new DeferredContentProvider();
+        Request request = client.newRequest("localhost", serverConnector.getLocalPort())
+                .timeout(5, TimeUnit.SECONDS)
+                .content(content);
+        FutureResponseListener listener = new FutureResponseListener(request);
+        request.send(listener);
+
+        // Send one chunk of content, the proxy request must not be sent.
+        ByteBuffer chunk1 = ByteBuffer.allocate(1024);
+        content.offer(chunk1);
+        Assert.assertFalse(proxyRequestLatch.await(1, TimeUnit.SECONDS));
+
+        // Send another chunk of content, the proxy request must be sent.
+        ByteBuffer chunk2 = ByteBuffer.allocate(512);
+        content.offer(chunk2);
+        Assert.assertTrue(proxyRequestLatch.await(5, TimeUnit.SECONDS));
+
+        // Finish the content.
+        content.close();
+
+        ContentResponse response = listener.get(5, TimeUnit.SECONDS);
+        Assert.assertEquals(HttpStatus.OK_200, response.getStatus());
+        Assert.assertEquals(chunk1.capacity() + chunk2.capacity(), response.getContent().length);
     }
 
     private Path prepareTargetTestsDir() throws IOException

@@ -31,8 +31,8 @@ import org.eclipse.jetty.util.ArrayQueue;
 import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
+import org.eclipse.jetty.util.thread.Locker;
 import org.eclipse.jetty.util.thread.Scheduler;
-import org.eclipse.jetty.util.thread.SpinLock;
 
 
 /* ------------------------------------------------------------ */
@@ -51,10 +51,10 @@ public class ByteArrayEndPoint extends AbstractEndPoint
         public void run()
         {
             getFillInterest().fillable();
-        }        
+        }
     };
-    
-    private final SpinLock _lock = new SpinLock();
+
+    private final Locker _locker = new Locker();
     private final Queue<ByteBuffer> _inQ = new ArrayQueue<>();
     private ByteBuffer _out;
     private boolean _ishut;
@@ -73,7 +73,8 @@ public class ByteArrayEndPoint extends AbstractEndPoint
 
     /* ------------------------------------------------------------ */
     /**
-     *
+     * @param input the input bytes
+     * @param outputSize the output size
      */
     public ByteArrayEndPoint(byte[] input, int outputSize)
     {
@@ -82,7 +83,8 @@ public class ByteArrayEndPoint extends AbstractEndPoint
 
     /* ------------------------------------------------------------ */
     /**
-     *
+     * @param input the input string (converted to bytes using default encoding charset)
+     * @param outputSize the output size
      */
     public ByteArrayEndPoint(String input, int outputSize)
     {
@@ -129,16 +131,16 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     {
         new Thread(task,"BAEPoint-"+Integer.toHexString(hashCode())).start();
     }
-    
+
     /* ------------------------------------------------------------ */
     @Override
     protected void needsFillInterest() throws IOException
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             if (_closed)
                 throw new ClosedChannelException();
-            
+
             ByteBuffer in = _inQ.peek();
             if (BufferUtil.hasContent(in) || in==EOF)
                 execute(_runFillable);
@@ -160,7 +162,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     public void addInput(ByteBuffer in)
     {
         boolean fillable=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             if (_inQ.peek()==EOF)
                 throw new RuntimeIOException(new EOFException());
@@ -183,7 +185,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     public void addInputAndExecute(ByteBuffer in)
     {
         boolean fillable=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             if (_inQ.peek()==EOF)
                 throw new RuntimeIOException(new EOFException());
@@ -235,6 +237,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
 
     /* ------------------------------------------------------------ */
     /**
+     * @param charset the charset to encode the output as
      * @return Returns the out.
      */
     public String getOutputString(Charset charset)
@@ -265,6 +268,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
 
     /* ------------------------------------------------------------ */
     /**
+     * @param charset the charset to encode the output as
      * @return Returns the out.
      */
     public String takeOutputString(Charset charset)
@@ -290,7 +294,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     @Override
     public boolean isOpen()
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             return !_closed;
         }
@@ -302,7 +306,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     @Override
     public boolean isInputShutdown()
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             return _ishut||_closed;
         }
@@ -314,7 +318,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     @Override
     public boolean isOutputShutdown()
     {
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             return _oshut||_closed;
         }
@@ -324,7 +328,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     public void shutdownInput()
     {
         boolean close=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             _ishut=true;
             if (_oshut && !_closed)
@@ -342,7 +346,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     public void shutdownOutput()
     {
         boolean close=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             _oshut=true;
             if (_ishut && !_closed)
@@ -360,7 +364,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     public void close()
     {
         boolean close=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             if (!_closed)
                 close=_closed=_ishut=_oshut=true;
@@ -387,7 +391,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     {
         int filled=0;
         boolean close=false;
-        try(SpinLock.Lock lock = _lock.lock())
+        try(Locker.Lock lock = _locker.lock())
         {
             while(true)
             {
@@ -396,10 +400,10 @@ public class ByteArrayEndPoint extends AbstractEndPoint
 
                 if (_ishut)
                     return -1;
-                
+
                 if (_inQ.isEmpty())
                     break;
-                
+
                 ByteBuffer in= _inQ.peek();
                 if (in==EOF)
                 {
@@ -409,7 +413,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
                     filled=-1;
                     break;
                 }
-                
+
                 if (BufferUtil.hasContent(in))
                 {
                     filled=BufferUtil.append(buffer,in);
@@ -420,7 +424,7 @@ public class ByteArrayEndPoint extends AbstractEndPoint
                 _inQ.poll();
             }
         }
-                
+
         if (close)
             super.close();
         if (filled>0)
