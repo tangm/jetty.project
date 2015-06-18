@@ -38,9 +38,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
@@ -723,28 +725,19 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
     {
         // Setup the features
         _features.clear();
-        for (Feature feature: getBeans(Feature.class))
+        Consumer<Feature> preEnableFeature = feature->
         {
-            if (_features.containsKey(feature.getKey()))
-                continue;
-            if (feature.preEnable(this))
+            if (!_features.containsKey(feature.getKey()) && feature.preEnable(this))
             {
                 if (LOG.isDebugEnabled())
-                    LOG.debug("enabled {} in {}",feature,this);
+                    LOG.debug("enabled {} in {}",feature,ContextHandler.this);
                 _features.put(feature.getKey(),feature);
             }
-        }
-        for (Feature feature: getServer().getBeans(Feature.class))
-        {
-            if (_features.containsKey(feature.getKey()))
-                continue;
-            if (feature.preEnable(this))
-            {
-                if (LOG.isDebugEnabled())
-                    LOG.debug("enabled {} from server in {}",feature,this);
-                _features.put(feature.getKey(),feature);
-            }
-        }
+        };
+        
+        getBeans(Feature.class).forEach(preEnableFeature);
+        getServer().getBeans(Feature.class).forEach(preEnableFeature);
+        ServiceLoader.load(Feature.class).forEach(preEnableFeature);
         
         _availability = Availability.STARTING;
 
