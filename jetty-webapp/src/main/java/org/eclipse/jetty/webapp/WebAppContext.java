@@ -138,8 +138,8 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         "org.eclipse.jetty."                // hide other jetty classes
     } ;
 
-    private ClassesList _systemClasses = null;
-    private ClassesList _serverClasses = null;
+    private ClasspathPattern _systemClasses = null;
+    private ClasspathPattern _serverClasses = null;
 
     private final List<Configuration> _configurations = new ArrayList<>();
     private String _defaultsDescriptor=WEB_DEFAULTS_XML;
@@ -672,7 +672,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     }
 
     /* ------------------------------------------------------------ */
-    public ClassesList getServerClassesList()
+    public ClasspathPattern getServerClassesList()
     {
         if (_serverClasses == null)
             loadServerClasses();
@@ -730,7 +730,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     }
 
     /* ------------------------------------------------------------ */
-    public ClassesList getSystemClassesList()
+    public ClasspathPattern getSystemClassesList()
     {
         if (_systemClasses == null)
             loadSystemClasses();
@@ -821,11 +821,11 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         {
             Object systemClasses = server.getAttribute(SERVER_SYS_CLASSES);
             if (systemClasses != null && systemClasses instanceof String[])
-                _systemClasses = new ClassesList((String[])systemClasses);
+                _systemClasses = new ClasspathPattern((String[])systemClasses);
         }
 
         if (_systemClasses == null)
-            _systemClasses = new ClassesList(__dftSystemClasses);
+            _systemClasses = new ClasspathPattern(__dftSystemClasses);
     }
 
     /* ------------------------------------------------------------ */
@@ -844,13 +844,13 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
             Object serverClasses = server.getAttribute(SERVER_SRV_CLASSES);
             if (serverClasses != null && serverClasses instanceof String[])
             {
-                _serverClasses = new ClassesList((String[])serverClasses);
+                _serverClasses = new ClasspathPattern((String[])serverClasses);
             }
         }
 
         if (_serverClasses == null)
         {
-            _serverClasses = new ClassesList(__dftServerClasses);
+            _serverClasses = new ClasspathPattern(__dftServerClasses);
         }
     }
 
@@ -1319,7 +1319,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
      */
     public void setServerClasses(String[] serverClasses)
     {
-        _serverClasses = new ClassesList(serverClasses);
+        _serverClasses = new ClasspathPattern(serverClasses);
     }
 
     /* ------------------------------------------------------------ */
@@ -1339,7 +1339,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
      */
     public void setSystemClasses(String[] systemClasses)
     {
-        _systemClasses = new ClassesList(systemClasses);
+        _systemClasses = new ClasspathPattern(systemClasses);
     }
 
 

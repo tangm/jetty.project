@@ -38,7 +38,7 @@ import java.util.StringTokenizer;
  * in this string should be separated by ':' (semicolon) or ',' (comma).
  */
 
-public class ClassesList extends AbstractList<String>
+public class ClasspathPattern extends AbstractList<String>
 {
     private static class Entry
     {
@@ -65,18 +65,18 @@ public class ClassesList extends AbstractList<String>
     final private List<Entry> _entries = new ArrayList<Entry>();
     
     /* ------------------------------------------------------------ */
-    public ClassesList()
+    public ClasspathPattern()
     {
     }
     
     /* ------------------------------------------------------------ */
-    public ClassesList(String[] patterns)
+    public ClasspathPattern(String[] patterns)
     {
         setAll(patterns);
     }
     
     /* ------------------------------------------------------------ */
-    public ClassesList(String pattern)
+    public ClasspathPattern(String pattern)
     {
         setPatterns(pattern);
     }
