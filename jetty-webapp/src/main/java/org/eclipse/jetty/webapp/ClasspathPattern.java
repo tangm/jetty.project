@@ -24,7 +24,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.StringTokenizer;
+
+import org.eclipse.jetty.util.StringUtil;
 
 /* ------------------------------------------------------------ */
 /**
@@ -78,7 +79,7 @@ public class ClasspathPattern extends AbstractList<String>
     /* ------------------------------------------------------------ */
     public ClasspathPattern(String pattern)
     {
-        setPatterns(pattern);
+        add(pattern);
     }
     
     /* ------------------------------------------------------------ */
@@ -103,6 +104,13 @@ public class ClasspathPattern extends AbstractList<String>
         _entries.add(index,new Entry(element));
     }
 
+    /* ------------------------------------------------------------ */
+    @Deprecated
+    public void addPattern(String element)
+    {
+        add(element);
+    }
+    
     /* ------------------------------------------------------------ */
     @Override
     public String remove(int index)
@@ -170,48 +178,11 @@ public class ClasspathPattern extends AbstractList<String>
             }
         }
     }
-    
-    
-    /* ------------------------------------------------------------ */
-    /**
-     * Initialize the matcher by parsing a classpath pattern string
-     * 
-     * @param classes classpath string which may be colon or comma separated
-     */
-    public void setPatterns(String classes)
-    {
-        _entries.clear();
-        addPatterns(classes);
-    }
 
     /* ------------------------------------------------------------ */
-    /**
-     * Parse a classpath pattern string and appending the result
-     * to the existing configuration.
-     * 
-     * @param patterns classpath string which may be colon or comma separated
-     */
-    public void addPatterns(String patterns)
+    public void prependPattern(String pattern)
     {
-        StringTokenizer entries = new StringTokenizer(patterns, ":,");
-        while (entries.hasMoreTokens())
-            add(entries.nextToken());
-    }   
-    
-
-    /* ------------------------------------------------------------ */
-    /**
-     * @param classes classpath string which may be colon or comma separated
-     */
-    public void prependPatterns(String classes)
-    {
-        StringTokenizer entries = new StringTokenizer(classes, ":,");
-        int i=0;
-        while (entries.hasMoreTokens())
-        {
-            add(i,entries.nextToken());
-            i++;
-        }
+        add(0,pattern);
     }
     
     /* ------------------------------------------------------------ */
@@ -220,11 +191,7 @@ public class ClasspathPattern extends AbstractList<String>
      */
     public String[] getPatterns()
     {
-        String[] patterns = new String[_entries.size()];
-        for (int i=0;i<_entries.size();i++)
-            patterns[i]=_entries.get(i)._pattern;
-        
-        return patterns;
+        return toArray(new String[_entries.size()]);
     }
 
     /* ------------------------------------------------------------ */
@@ -251,48 +218,27 @@ public class ClasspathPattern extends AbstractList<String>
      */
     public boolean match(String name)
     {       
-        boolean result=false;
+        name = name.replace('/','.');
 
-        if (_entries != null)
+        for (Entry entry : _entries)
         {
-            name = name.replace('/','.');
-
-            int startIndex = 0;
-
-            while(startIndex < name.length() && name.charAt(startIndex) == '.') {
-                startIndex++;
-            }
-
-            int dollar = name.indexOf("$");
-
-            int endIndex =  dollar != -1 ? dollar : name.length();
-
-            for (Entry entry : _entries)
+            if (entry==null)
+                continue;
+            if (entry._package)
             {
-                if (entry != null)
-                {               
-                    if (entry._package)
-                    {
-                        if (name.regionMatches(startIndex, entry._name, 0, entry._name.length()))
-                        {
-                            result = entry._inclusive;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        int regionLength = endIndex-startIndex;
-                        if (regionLength == entry._name.length()
-                                && name.regionMatches(startIndex, entry._name, 0, regionLength))
-                        {
-                            result = entry._inclusive;
-                            break;
-                        }
-                    }
-                }
+                if (name.startsWith(entry._name))
+                    return entry._inclusive;
+            }
+            else
+            {
+                if (name.equals(entry._name))
+                    return entry._inclusive;
+                
+                if (name.length()>entry._name.length() && '$'==name.charAt(entry._name.length()) && name.startsWith(entry._name))
+                    return entry._inclusive;
             }
         }
-        return result;
+        return false;
     }
 
     public void addAfter(String afterPattern,String... patterns)
@@ -333,5 +279,4 @@ public class ClasspathPattern extends AbstractList<String>
         }
         throw new IllegalArgumentException("before '"+beforePattern+"' not found in "+this);
     }
-    
 }

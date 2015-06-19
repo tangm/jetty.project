@@ -61,6 +61,7 @@ import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.util.AttributesMap;
 import org.eclipse.jetty.util.Loader;
 import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.URIUtil;
 import org.eclipse.jetty.util.annotation.ManagedAttribute;
 import org.eclipse.jetty.util.annotation.ManagedObject;
@@ -117,7 +118,6 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         "org.w3c.",                         // needed by javax.xml
         "org.eclipse.jetty.continuation.",  // webapp cannot change continuation classes
         "org.eclipse.jetty.util.log.",      // webapp should use server log
-        "org.eclipse.jetty.servlet.ServletContextHandler.Decorator", // for CDI / weld use
         "org.eclipse.jetty.servlet.DefaultServlet", // webapp cannot change default servlets
         "org.eclipse.jetty.servlets.PushCacheFilter" //must be loaded by container classpath
     } ;
@@ -134,7 +134,6 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         "-org.eclipse.jetty.servlet.listener.", // don't hide useful listeners
         "-org.eclipse.jetty.apache.",       // don't hide jetty apache impls
         "-org.eclipse.jetty.util.log.",     // don't hide server log 
-        "-org.eclipse.jetty.servlet.ServletContextHandler.Decorator", // don't hide CDI / weld interface  
         "org.eclipse.jetty."                // hide other jetty classes
     } ;
 
@@ -708,7 +707,8 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         if (_serverClasses == null)
             loadServerClasses();
 
-        _serverClasses.addPatterns(classOrPackage);
+        for (String p:StringUtil.split(classOrPackage)) 
+            _serverClasses.add(p);
     }
 
     /* ------------------------------------------------------------ */
@@ -726,7 +726,9 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         if (_serverClasses == null)
             loadServerClasses();
 
-        _serverClasses.prependPatterns(classOrPackage);
+        String[] p = StringUtil.split(classOrPackage);
+        for (int i=p.length;i-->0;)
+            _serverClasses.prependPattern(p[i]);
     }
 
     /* ------------------------------------------------------------ */
@@ -766,7 +768,8 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         if (_systemClasses == null)
             loadSystemClasses();
 
-        _systemClasses.addPatterns(classOrPackage);
+        for (String p:StringUtil.split(classOrPackage)) 
+            _systemClasses.add(p);
     }
 
 
@@ -785,7 +788,9 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         if (_systemClasses == null)
             loadSystemClasses();
 
-        _systemClasses.prependPatterns(classOrPackage);
+        String[] p = StringUtil.split(classOrPackage);
+        for (int i=p.length;i-->0;)
+            _systemClasses.prependPattern(p[i]);
     }
 
     /* ------------------------------------------------------------ */
@@ -984,7 +989,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         }
         return super.toString();
     }
-
+    
     /* ------------------------------------------------------------ */
     @Override
     public void dump(Appendable out, String indent) throws IOException
