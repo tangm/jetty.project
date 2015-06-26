@@ -155,6 +155,10 @@ public class StartArgs
     /** --add-to-start=[module,[module]] */
     private List<String> addToStartIni = new ArrayList<>();
 
+    /** Tri-state True if modules should be added to StartdFirst, false if StartIni first, else null */
+    private Boolean addToStartdFirst;
+    
+    
     // module inspection commands
     /** --write-module-graph=[filename] */
     private String moduleGraphFilename;
@@ -179,6 +183,7 @@ public class StartArgs
 
     private boolean exec = false;
     private boolean approveAllLicenses = false;
+   
 
     public StartArgs()
     {
@@ -771,6 +776,13 @@ public class StartArgs
         return version;
     }
 
+    public boolean isAddToStartdFirst()
+    {
+        if (addToStartdFirst==null)
+            throw new IllegalStateException();
+        return addToStartdFirst.booleanValue();
+    }
+    
     public void parse(ConfigSources sources)
     {
         ListIterator<ConfigSource> iter = sources.reverseListIterator();
@@ -799,7 +811,7 @@ public class StartArgs
      * @param replaceProps
      *            true if properties in this parse replace previous ones, false to not replace.
      */
-    private void parse(final String rawarg, String source, boolean replaceProps)
+    public void parse(final String rawarg, String source, boolean replaceProps)
     {
         if (rawarg == null)
         {
@@ -936,6 +948,8 @@ public class StartArgs
             run = false;
             download = true;
             licenseCheckRequired = true;
+            if (addToStartdFirst==null)
+                addToStartdFirst=Boolean.TRUE;
             return;
         }
 
@@ -947,6 +961,8 @@ public class StartArgs
             run = false;
             download = true;
             licenseCheckRequired = true;
+            if (addToStartdFirst==null)
+                addToStartdFirst=Boolean.FALSE;
             return;
         }
 
