@@ -23,6 +23,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -142,6 +143,16 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
     public void setRequestLog(RequestLog requestLog)
     {
         _requestLog = requestLog;
+    }
+
+    public void addRequestLog(RequestLog requestLog)
+    {
+        if (_requestLog==null)
+            _requestLog = requestLog;
+        else if (_requestLog instanceof RequestLogCollection)
+            ((RequestLogCollection) _requestLog).add(requestLog);
+        else
+            _requestLog = new RequestLogCollection(_requestLog, requestLog);
     }
 
     public MetaData.Response getCommittedMetaData()
@@ -265,7 +276,7 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
             // The loop is controlled by the call to async.unhandle in the
             // finally block below.  Unhandle will return false only if an async dispatch has
             // already happened when unhandle is called.
-            loop: while (action.ordinal()<HttpChannelState.Action.WAIT.ordinal() && getServer().isRunning())
+            loop: while (action.ordinal()<HttpChannelState.Action.WAIT.ordinal() && !getServer().isStopped())
             {
                 boolean error=false;
                 try
@@ -305,7 +316,7 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
 
                             Throwable ex=_state.getAsyncContextEvent().getThrowable();
                             String reason="Async Timeout";
-                            if (ex!=null)
+                            if (ex!=null && !(ex instanceof TimeoutException))
                             {
                                 reason="Async Exception";
                                 _request.setAttribute(RequestDispatcher.ERROR_EXCEPTION,ex);
@@ -365,7 +376,10 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
                 catch (Exception e)
                 {
                     error=true;
-                    LOG.warn(String.valueOf(_request.getHttpURI()), e);
+                    if (_connector.isStarted())
+                        LOG.warn(String.valueOf(_request.getHttpURI()), e);
+                    else
+                        LOG.debug(String.valueOf(_request.getHttpURI()), e);
                     _state.error(e);
                     _request.setHandled(true);
                     handleException(e);
@@ -377,6 +391,10 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
                     else
                     {
                         error=true;
+                        if (_connector.isStarted())
+                            LOG.warn(String.valueOf(_request.getHttpURI()), e);
+                        else
+                            LOG.debug(String.valueOf(_request.getHttpURI()), e);
                         LOG.warn(String.valueOf(_request.getHttpURI()), e);
                         _state.error(e);
                         _request.setHandled(true);
