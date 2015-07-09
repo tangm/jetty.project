@@ -32,14 +32,11 @@ public class ServerWithJNDI
 {
     public static void main( String[] args ) throws Exception
     {
-
         // Create the server
         Server server = new Server(8080);
 
         // Enable parsing of jndi-related parts of web.xml and jetty-env.xml
-        Configuration.ClassList classlist = Configuration.ClassList
-                .setServerDefault(server);
-        classlist.addAfter("org.eclipse.jetty.webapp.FragmentConfiguration",
+        Configuration.addDefault(server,
                 "org.eclipse.jetty.plus.webapp.EnvConfiguration",
                 "org.eclipse.jetty.plus.webapp.PlusConfiguration");
 

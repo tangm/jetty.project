@@ -20,12 +20,15 @@ package org.eclipse.jetty.webapp;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
-import java.util.ListIterator;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.util.annotation.Name;
-
+import org.eclipse.jetty.util.Loader;
+import org.eclipse.jetty.util.StringUtil;
 
 /* ------------------------------------------------------------------------------- */
 /** Base Class for WebApplicationContext Configuration.
@@ -35,6 +38,116 @@ import org.eclipse.jetty.util.annotation.Name;
 public interface Configuration 
 {
     public final static String ATTR="org.eclipse.jetty.webapp.configuration";
+
+    public static void addDefault(Server server, String... configurationClass)
+    {
+        addDefault(server,Arrays.asList(configurationClass).stream().map(cc->
+        {
+            Configuration c;
+            try
+            {
+                c = ((Class<? extends Configuration>)Loader.loadClass(server.getClass(),cc)).newInstance();
+                return c;
+            }
+            catch (Exception e)
+            {   
+                throw new RuntimeException(e);
+            }
+        }).collect(Collectors.toList()).toArray(new Configuration[0]));
+    }
+    
+    public static void addDefault(Server server, Configuration... configuration)
+    {
+        List<Configuration> configurations = new ArrayList<>();
+        Object attr = server.getAttribute(Configuration.ATTR);
+
+        // Look for server default as collection of strings or instances
+        Stream<? extends Object> stream=null;
+        if (attr instanceof String)
+            stream=Arrays.asList(StringUtil.csvSplit((String)attr)).stream();
+        else if (attr instanceof Collection<?>)
+            stream=((Collection<?>)attr).stream();
+        else if (attr instanceof String[])
+            stream=Arrays.asList((String[])attr).stream();
+        else if (attr instanceof Configuration[])
+            stream=Arrays.asList((Configuration[])attr).stream();
+        
+        // Add the configurations
+        if (stream!=null)
+        {
+            stream.forEach(o->
+            {
+                if (o instanceof Configuration)
+                    configurations.add((Configuration)o);
+                else
+                {
+                    try
+                    {
+                        configurations.add((Configuration)Loader.loadClass(server.getClass(), String.valueOf(o)).newInstance());
+                    }
+                    catch (Exception e)
+                    {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        }
+        
+        configurations.addAll(Arrays.asList(configuration));
+        server.setAttribute(Configuration.ATTR,configurations);
+    }
+
+    /* ------------------------------------------------------------------------------- */
+    public static String[] getDefaultClasses(Server server)
+    {
+        List<Configuration> configurations = new ArrayList<>();
+        Object attr = server.getAttribute(Configuration.ATTR);
+
+        // Look for server default as collection of strings or instances
+        Stream<? extends Object> stream=null;
+        if (attr instanceof String)
+            stream=Arrays.asList(StringUtil.csvSplit((String)attr)).stream();
+        else if (attr instanceof Collection<?>)
+            stream=((Collection<?>)attr).stream();
+        else if (attr instanceof String[])
+            stream=Arrays.asList((String[])attr).stream();
+        else if (attr instanceof Configuration[])
+            stream=Arrays.asList((Configuration[])attr).stream();
+        
+        // Add the configurations
+        if (stream!=null)
+        {
+            stream.forEach(o->
+            {
+                if (o instanceof Configuration)
+                    configurations.add((Configuration)o);
+                else
+                {
+                    try
+                    {
+                        configurations.add((Configuration)Loader.loadClass(server.getClass(), String.valueOf(o)).newInstance());
+                    }
+                    catch (Exception e)
+                    {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        }
+
+        server.setAttribute(Configuration.ATTR,configurations);
+        return configurations.toArray(new String[configurations.size()]);
+        
+    }
+    
+    /* ------------------------------------------------------------------------------- */
+    public String getName();
+
+    /* ------------------------------------------------------------------------------- */
+    public Set<String> getDependsOn();
+
+    /* ------------------------------------------------------------------------------- */
+    public Set<String> getDependents();
     
     /* ------------------------------------------------------------------------------- */
     /** Set up for configuration.
@@ -93,109 +206,4 @@ public interface Configuration
      * @throws Exception if unable to clone
      */
     public void cloneConfigure (WebAppContext template, WebAppContext context) throws Exception;
-    
-    
-    public class ClassList extends ArrayList<String>
-    {        
-        /* ------------------------------------------------------------ */
-        /** Get/Set/Create the server default Configuration ClassList.
-         * <p>Get the class list from: a Server bean; or the attribute (which can
-         * either be a ClassList instance or an String[] of class names); or a new instance
-         * with default configuration classes.</p>
-         * <p>This method also adds the obtained ClassList instance as a dependent bean
-         * on the server and clears the attribute</p>
-         * @param server The server the default is for
-         * @return the server default ClassList instance of the configuration classes for this server. Changes to this list will change the server default instance.
-         */
-        public static ClassList setServerDefault(Server server)
-        {
-            ClassList cl=server.getBean(ClassList.class);
-            if (cl!=null)
-                return cl;
-            cl=serverDefault(server);
-            server.addBean(cl);
-            server.setAttribute(ATTR,null);
-            return cl;
-        }
-
-        /* ------------------------------------------------------------ */
-        /** Get/Create the server default Configuration ClassList.
-         * <p>Get the class list from: a Server bean; or the attribute (which can
-         * either be a ClassList instance or an String[] of class names); or a new instance
-         * with default configuration classes.
-         * @param server The server the default is for
-         * @return A copy of the server default ClassList instance of the configuration classes for this server. Changes to the returned list will not change the server default.
-         */
-        public static ClassList serverDefault(Server server)
-        {
-            ClassList cl=null;
-            if (server!=null)
-            {
-                cl= server.getBean(ClassList.class);
-                if (cl!=null)
-                    return new ClassList(cl);
-                Object attr = server.getAttribute(ATTR);
-                if (attr instanceof ClassList)
-                    return new ClassList((ClassList)attr);
-                if (attr instanceof String[])
-                    return new ClassList((String[])attr);
-            }
-            return new ClassList();
-        }
-        
-        public ClassList()
-        {
-            this(WebAppContext.DEFAULT_CONFIGURATION_CLASSES);
-        }
-        
-        public ClassList(String[] classes)
-        {
-            addAll(Arrays.asList(classes));
-        }
-
-        public ClassList(List<String> classes)
-        {
-            addAll(classes);
-        }
-        
-        public void addAfter(@Name("afterClass") String afterClass,@Name("configClass")String... configClass)
-        {
-            if (configClass!=null && afterClass!=null)
-            {
-                ListIterator<String> iter = listIterator();
-                while (iter.hasNext())
-                {
-                    String cc=iter.next();
-                    if (afterClass.equals(cc))
-                    {
-                        for (int i=0;i<configClass.length;i++)
-                            iter.add(configClass[i]);
-                        return;
-                    }
-                }
-            }
-            throw new IllegalArgumentException("afterClass '"+afterClass+"' not found in "+this);
-        }
-
-        public void addBefore(@Name("beforeClass") String beforeClass,@Name("configClass")String... configClass)
-        {
-            if (configClass!=null && beforeClass!=null)
-            {
-                ListIterator<String> iter = listIterator();
-                while (iter.hasNext())
-                {
-                    String cc=iter.next();
-                    if (beforeClass.equals(cc))
-                    {
-                        iter.previous();
-                        for (int i=0;i<configClass.length;i++)
-                            iter.add(configClass[i]);
-                        return;
-                    }
-                }
-            }
-            throw new IllegalArgumentException("beforeClass '"+beforeClass+"' not found in "+this);
-        }
-        
-    }
 }

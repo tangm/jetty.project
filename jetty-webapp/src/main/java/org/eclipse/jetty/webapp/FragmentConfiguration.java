@@ -32,6 +32,16 @@ public class FragmentConfiguration extends AbstractConfiguration
 {
     public final static String FRAGMENT_RESOURCES="org.eclipse.jetty.webFragments";
     
+
+    public static final String NAME="Fragment";
+
+    /* ------------------------------------------------------------------------------- */
+    public FragmentConfiguration()
+    {
+        super(NAME,new String[]{MetaInfConfiguration.NAME});
+    }
+    
+    
     @Override
     public void preConfigure(WebAppContext context) throws Exception
     {

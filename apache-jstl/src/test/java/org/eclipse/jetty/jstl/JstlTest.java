@@ -30,8 +30,8 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.toolchain.test.FS;
 import org.eclipse.jetty.toolchain.test.MavenTestingUtils;
 import org.eclipse.jetty.toolchain.test.SimpleRequest;
-import org.eclipse.jetty.webapp.WebAppContext;
 import org.eclipse.jetty.webapp.Configuration;
+import org.eclipse.jetty.webapp.WebAppContext;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -55,13 +55,8 @@ public class JstlTest
         // Setup WebAppContext
         File testWebAppDir = MavenTestingUtils.getProjectDir("src/test/webapp");
  
-        Configuration.ClassList classlist = Configuration.ClassList
-                .setServerDefault(server);
-
-        classlist.addBefore(
-                "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
-                "org.eclipse.jetty.annotations.AnnotationConfiguration");
-
+        Configuration.addDefault(server,"org.eclipse.jetty.webapp.JettyWebXmlConfiguration");
+        Configuration.addDefault(server,"org.eclipse.jetty.annotations.AnnotationConfiguration");
         
         WebAppContext context = new WebAppContext();
         context.setContextPath("/");

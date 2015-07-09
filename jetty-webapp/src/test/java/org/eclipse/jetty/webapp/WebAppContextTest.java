@@ -26,6 +26,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 import javax.servlet.GenericServlet;
 import javax.servlet.ServletContext;
@@ -40,56 +41,95 @@ import org.eclipse.jetty.server.handler.HandlerList;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.resource.ResourceCollection;
+import org.hamcrest.Matchers;
 import org.junit.Assert;
 import org.junit.Test;
 
 public class WebAppContextTest
 {
     @Test
-    public void testConfigurationClassesFromDefault ()
+    public void testConfigurationClassesFromDefault() throws Exception
     {
         Server server = new Server();
         //test if no classnames set, its the defaults
         WebAppContext wac = new WebAppContext();
+        server.setHandler(wac);
         assertEquals(0,wac.getConfigurations().length);
         String[] classNames = wac.getConfigurationClasses();
         assertNotNull(classNames);
+        assertEquals(0,classNames.length);
 
-        //test if no classname set, and none from server its the defaults
-        wac.setServer(server);
-        assertTrue(Arrays.equals(classNames, wac.getConfigurationClasses()));
+        wac.loadConfigurations();
+        Assert.assertThat(
+            Arrays.asList(wac.getConfigurations()).stream().map(c->{return c.getClass().getName();}).collect(Collectors.toList()).toArray(new String[0]),
+            Matchers.arrayContaining(WebAppContext.DEFAULT_CONFIGURATION_CLASSES));
+        
     }
-
+    
+    
     @Test
-    public void testConfigurationClassesExplicit ()
+    public void testConfigurationClassesFromServerDefault() throws Exception
     {
-        String[] classNames = {"x.y.z"};
-
         Server server = new Server();
-        server.setAttribute(Configuration.ATTR, classNames);
-
-        //test an explicitly set classnames list overrides that from the server
+        //test if no classnames set, its the defaults
         WebAppContext wac = new WebAppContext();
-        String[] myClassNames = {"a.b.c", "d.e.f"};
-        wac.setConfigurationClasses(myClassNames);
-        wac.setServer(server);
-        String[] names = wac.getConfigurationClasses();
-        assertTrue(Arrays.equals(myClassNames, names));
+        server.setHandler(wac);
 
+        String[] configs=
+        {
+            "org.eclipse.jetty.webapp.MetaInfConfiguration",
+            "org.eclipse.jetty.webapp.WebXmlConfiguration",
+            "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
+            "org.eclipse.jetty.webapp.WebInfConfiguration"
+        } ;
+        
+        String[] configs_sorted=
+        {
+            "org.eclipse.jetty.webapp.WebInfConfiguration",
+            "org.eclipse.jetty.webapp.WebXmlConfiguration",
+            "org.eclipse.jetty.webapp.MetaInfConfiguration",
+            "org.eclipse.jetty.webapp.JettyWebXmlConfiguration"
+        } ;
+        
+        server.setAttribute(Configuration.ATTR,configs);
 
-        //test if no explicit classnames, they come from the server
-        WebAppContext wac2 = new WebAppContext();
-        wac2.setServer(server);
-        try
-        {
-            wac2.loadConfigurations();
-        }
-        catch(Exception e)
-        {
-            Log.getRootLogger().ignore(e);
-        }
-        assertTrue(Arrays.equals(classNames, wac2.getConfigurationClasses()));
+        wac.loadConfigurations();
+        Assert.assertThat(
+            Arrays.asList(wac.getConfigurations()).stream().map(c->{return c.getClass().getName();}).collect(Collectors.toList()).toArray(new String[0]),
+            Matchers.arrayContaining(configs_sorted));
+        
     }
+    @Test
+    public void testConfigurationClasses() throws Exception
+    {
+        Server server = new Server();
+        //test if no classnames set, its the defaults
+        WebAppContext wac = new WebAppContext();
+        server.setHandler(wac);
+
+        wac.setConfigurations(new Configuration[]
+        {
+            new org.eclipse.jetty.webapp.MetaInfConfiguration(),
+            new org.eclipse.jetty.webapp.WebXmlConfiguration(),
+            new org.eclipse.jetty.webapp.JettyWebXmlConfiguration(),
+            new org.eclipse.jetty.webapp.WebInfConfiguration()
+        });
+        
+        String[] configs_sorted=
+        {
+            "org.eclipse.jetty.webapp.WebInfConfiguration",
+            "org.eclipse.jetty.webapp.WebXmlConfiguration",
+            "org.eclipse.jetty.webapp.MetaInfConfiguration",
+            "org.eclipse.jetty.webapp.JettyWebXmlConfiguration"
+        } ;
+        
+        wac.loadConfigurations();
+        Assert.assertThat(
+            Arrays.asList(wac.getConfigurations()).stream().map(c->{return c.getClass().getName();}).collect(Collectors.toList()).toArray(new String[0]),
+            Matchers.arrayContaining(configs_sorted));
+        
+    }
+
 
     @Test
     public void testConfigurationInstances ()

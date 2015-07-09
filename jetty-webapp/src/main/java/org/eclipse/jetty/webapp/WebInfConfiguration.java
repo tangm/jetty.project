@@ -47,6 +47,7 @@ public class WebInfConfiguration extends AbstractConfiguration
 {
     private static final Logger LOG = Log.getLogger(WebInfConfiguration.class);
 
+    public static final String NAME="WebInf";
     public static final String TEMPDIR_CONFIGURED = "org.eclipse.jetty.tmpdirConfigured";
     public static final String CONTAINER_JAR_PATTERN = "org.eclipse.jetty.server.webapp.ContainerIncludeJarPattern";
     public static final String WEBINF_JAR_PATTERN = "org.eclipse.jetty.server.webapp.WebInfIncludeJarPattern";
@@ -61,6 +62,11 @@ public class WebInfConfiguration extends AbstractConfiguration
     protected Resource _preUnpackBaseResource;
     
 
+    /* ------------------------------------------------------------------------------- */
+    public WebInfConfiguration()
+    {
+        super(NAME,new String[]{});
+    }
 
     @Override
     public void preConfigure(final WebAppContext context) throws Exception
