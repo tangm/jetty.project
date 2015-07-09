@@ -18,8 +18,64 @@
 
 package org.eclipse.jetty.webapp;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 public class AbstractConfiguration implements Configuration
 {
+    private final String _name;
+    private final Set<String> _dependsOn;
+    private final Set<String> _dependents;
+
+    protected AbstractConfiguration(String name)
+    {
+        this(name,null,null);
+    }
+    
+    protected AbstractConfiguration(String name, String[] dependsOn)
+    {
+        this(name,dependsOn,null);
+    }
+    
+    protected AbstractConfiguration(String name,String[] dependsOn, String[] dependents)
+    {
+        _name=name;
+        _dependsOn=Collections.unmodifiableSet(dependsOn==null?Collections.emptySet():new HashSet<>(Arrays.asList(dependsOn)));
+        _dependents=Collections.unmodifiableSet(dependents==null?Collections.emptySet():new HashSet<>(Arrays.asList(dependents)));
+    }
+    
+    @Override
+    public String getName()
+    {
+        return _name;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return _name.hashCode();
+    }
+    
+    @Override 
+    public boolean equals(Object obj) 
+    {
+        return obj instanceof AbstractConfiguration && ((AbstractConfiguration)obj)._name.equals(_name);
+    };
+    
+    @Override
+    public Set<String> getDependsOn()
+    {
+        return _dependsOn;
+    }
+
+    @Override
+    public Set<String> getDependents()
+    {
+        return _dependents;
+    }
+    
     public void preConfigure(WebAppContext context) throws Exception
     {
     }
@@ -43,4 +99,5 @@ public class AbstractConfiguration implements Configuration
     public void cloneConfigure(WebAppContext template, WebAppContext context) throws Exception
     {
     }
+
 }

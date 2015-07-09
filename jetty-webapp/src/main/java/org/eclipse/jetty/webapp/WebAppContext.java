@@ -32,10 +32,12 @@ import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import javax.servlet.Servlet;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletRegistration.Dynamic;
 import javax.servlet.ServletSecurityElement;
@@ -63,6 +65,8 @@ import org.eclipse.jetty.util.AttributesMap;
 import org.eclipse.jetty.util.IO;
 import org.eclipse.jetty.util.Loader;
 import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.StringUtil;
+import org.eclipse.jetty.util.TopologicalSort;
 import org.eclipse.jetty.util.URIUtil;
 import org.eclipse.jetty.util.annotation.ManagedAttribute;
 import org.eclipse.jetty.util.annotation.ManagedObject;
@@ -156,7 +160,6 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         "org.eclipse.jetty."                // hide other jetty classes
     } ;
 
-    private final List<String> _configurationClasses = new ArrayList<>();
     private ClasspathPattern _systemClasses = null;
     private ClasspathPattern _serverClasses = null;
 
@@ -592,7 +595,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     @ManagedAttribute(value="configuration classes used to configure webapp", readonly=true)
     public String[] getConfigurationClasses()
     {
-        return _configurationClasses.toArray(new String[_configurationClasses.size()]);
+        return _configurations.stream().map(c->{return c.getClass().getSimpleName();}).collect(Collectors.toList()).toArray(new String[]{});
     }
 
     /* ------------------------------------------------------------ */
@@ -918,14 +921,77 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     protected void loadConfigurations()
         throws Exception
     {
-        //if the configuration instances have been set explicitly, use them
-        if (_configurations.size()>0)
-            return;
+        //if the configuration instances have not been set explicitly
+        if (_configurations.size()==0)
+        {
+            Object attr = getServer().getAttribute(Configuration.ATTR);
+
+            // Look for server default as collection of strings or instances
+            Stream<? extends Object> stream=null;
+
+            if (attr == null)
+                stream=Arrays.asList(DEFAULT_CONFIGURATION_CLASSES).stream();
+            else if (attr instanceof String)
+                stream=Arrays.asList(StringUtil.csvSplit((String)attr)).stream();
+            else if (attr instanceof Collection<?>)
+                stream=((Collection<?>)attr).stream();
+            else if (attr instanceof String[])
+                stream=Arrays.asList((String[])attr).stream();
+            else if (attr instanceof Configuration[])
+                stream=Arrays.asList((Configuration[])attr).stream();
+            
+            // Add the configurations
+            if (stream!=null)
+            {
+                stream.forEach(o->
+                {
+                    if (o instanceof Configuration)
+                        _configurations.add((Configuration)o);
+                    else
+                    {
+                        try
+                        {
+                            _configurations.add((Configuration)Loader.loadClass(this.getClass(), String.valueOf(o)).newInstance());
+                        }
+                        catch (Exception e)
+                        {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                });
+            }
+        }
         
-        if (_configurationClasses.size()==0)
-            _configurationClasses.addAll(Configuration.ClassList.serverDefault(getServer()));
-        for (String configClass : _configurationClasses)
-            _configurations.add((Configuration)Loader.loadClass(this.getClass(), configClass).newInstance());
+        // Remove duplicate names while preserving order
+        Map<String,Configuration> n2c = new HashMap<>();
+        for (Configuration c : _configurations)
+            n2c.put(c.getName(),c);
+        ListIterator<Configuration> iter = _configurations.listIterator();
+        while (iter.hasNext())
+            if (!n2c.values().contains(iter.next()))
+                iter.remove();
+
+        // Sort the configurations
+        TopologicalSort<Configuration> sort = new TopologicalSort<>();
+        for(Configuration c : _configurations)
+        {
+            for (String dependsOn : c.getDependsOn())
+            {
+                Configuration d = n2c.get(dependsOn);
+                if (d!=null)
+                    sort.addDependency(c,d);
+            }
+            for (String dependents : c.getDependents())
+            {
+                Configuration d = n2c.get(dependents);
+                if (d!=null)
+                    sort.addDependency(d,c);
+            }
+        }
+        
+        sort.sort(_configurations);
+        if (LOG.isDebugEnabled())
+            LOG.debug("{} configurations {}",this,_configurations);
     }
 
     /* ------------------------------------------------------------ */
@@ -961,18 +1027,21 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     /**
      * @param configurations The configuration class names.  If setConfigurations is not called
      * these classes are used to create a configurations array.
+     * @throws ClassNotFoundException 
+     * @throws IllegalAccessException 
+     * @throws InstantiationException 
      */
-    public void setConfigurationClasses(String[] configurations)
+    public void setConfigurationClasses(String[] configurations) throws ClassNotFoundException, IllegalAccessException, InstantiationException
     {
         if (isStarted())
             throw new IllegalStateException();
-        _configurationClasses.clear();
-        if (configurations!=null)
-            _configurationClasses.addAll(Arrays.asList(configurations));
         _configurations.clear();
+        for (String configClass : configurations)
+            _configurations.add((Configuration)Loader.loadClass(this.getClass(), configClass).newInstance());
     }
-
-    public void setConfigurationClasses(List<String> configurations)
+    
+    /* ------------------------------------------------------------ */
+    public void setConfigurationClasses(List<String> configurations) throws ClassNotFoundException, IllegalAccessException, InstantiationException
     {
         setConfigurationClasses(configurations.toArray(new String[configurations.size()]));
     }
@@ -1475,7 +1544,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
             {
                 //not one of the standard servlet listeners, check our extended session listener types
                 boolean ok = false;
-                for (Class l:SessionHandler.SESSION_LISTENER_TYPES)
+                for (Class<? extends EventListener> l:SessionHandler.SESSION_LISTENER_TYPES)
                 {
                     if (l.isAssignableFrom(listener))
                     {
@@ -1503,11 +1572,11 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
                 for (int i=resources.length;i-->0;)
                 {
                     if (resources[i].getName().startsWith("jar:file"))
-                        return resources[i].getURL();
+                        return resources[i].getURI().toURL();
                 }
             }
 
-            return resource.getURL();
+            return resource.getURI().toURL();
         }
 
         /* ------------------------------------------------------------ */

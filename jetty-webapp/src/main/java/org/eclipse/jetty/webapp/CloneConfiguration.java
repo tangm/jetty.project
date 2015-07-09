@@ -20,10 +20,12 @@ package org.eclipse.jetty.webapp;
 
 public class CloneConfiguration extends AbstractConfiguration
 {
-    final WebAppContext _template;
+    public final static String NAME = "Clone";
+    private final WebAppContext _template;
     
     CloneConfiguration(WebAppContext template)
     {
+        super(NAME);
         _template=template;
     }
     

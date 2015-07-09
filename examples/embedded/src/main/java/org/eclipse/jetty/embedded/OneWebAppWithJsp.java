@@ -66,9 +66,7 @@ public class OneWebAppWithJsp
         // This webapp will use jsps and jstl. We need to enable the
         // AnnotationConfiguration in order to correctly
         // set up the jsp container
-        Configuration.ClassList classlist = Configuration.ClassList
-                .setServerDefault( server );
-        classlist.addBefore(
+        Configuration.addDefault(server,
                 "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
                 "org.eclipse.jetty.annotations.AnnotationConfiguration" );
 

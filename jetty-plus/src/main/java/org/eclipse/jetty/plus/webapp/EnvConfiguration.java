@@ -41,6 +41,9 @@ import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.webapp.AbstractConfiguration;
 import org.eclipse.jetty.webapp.Configuration;
+import org.eclipse.jetty.webapp.FragmentConfiguration;
+import org.eclipse.jetty.webapp.JettyWebXmlConfiguration;
+import org.eclipse.jetty.webapp.MetaInfConfiguration;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.eclipse.jetty.xml.XmlConfiguration;
 
@@ -52,9 +55,16 @@ public class EnvConfiguration extends AbstractConfiguration
 {
     private static final Logger LOG = Log.getLogger(EnvConfiguration.class);
 
+    public static final String NAME="Env";
+    
     private static final String JETTY_ENV_BINDINGS = "org.eclipse.jetty.jndi.EnvConfiguration";
     private URL jettyEnvXmlUrl;
 
+    public EnvConfiguration()
+    {
+        super(NAME,new String[]{FragmentConfiguration.NAME},new String[]{JettyWebXmlConfiguration.NAME});
+    }
+    
     public void setJettyEnvXml (URL url)
     {
         this.jettyEnvXmlUrl = url;

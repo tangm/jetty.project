@@ -45,6 +45,7 @@ import javax.servlet.annotation.HandlesTypes;
 
 import org.eclipse.jetty.annotations.AnnotationParser.Handler;
 import org.eclipse.jetty.plus.annotation.ContainerInitializer;
+import org.eclipse.jetty.plus.webapp.PlusConfiguration;
 import org.eclipse.jetty.util.ConcurrentHashSet;
 import org.eclipse.jetty.util.MultiException;
 import org.eclipse.jetty.util.StringUtil;
@@ -54,9 +55,11 @@ import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.statistic.CounterStatistic;
 import org.eclipse.jetty.webapp.AbstractConfiguration;
 import org.eclipse.jetty.webapp.FragmentDescriptor;
+import org.eclipse.jetty.webapp.JettyWebXmlConfiguration;
 import org.eclipse.jetty.webapp.MetaDataComplete;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.eclipse.jetty.webapp.WebDescriptor;
+import org.eclipse.jetty.webapp.WebXmlConfiguration;
 
 /**
  * Configuration for Annotations
@@ -64,7 +67,8 @@ import org.eclipse.jetty.webapp.WebDescriptor;
 public class AnnotationConfiguration extends AbstractConfiguration
 {
     private static final Logger LOG = Log.getLogger(AnnotationConfiguration.class);
-    
+ 
+    public static final String NAME="Annotations";
     public static final String SERVLET_CONTAINER_INITIALIZER_EXCLUSION_PATTERN = "org.eclipse.jetty.containerInitializerExclusionPattern";
     public static final String SERVLET_CONTAINER_INITIALIZER_ORDER = "org.eclipse.jetty.containerInitializerOrder";
     public static final String CLASS_INHERITANCE_MAP  = "org.eclipse.jetty.classInheritanceMap";
@@ -89,6 +93,11 @@ public class AnnotationConfiguration extends AbstractConfiguration
     protected CounterStatistic _webInfClassesStats;
     protected Pattern _sciExcludePattern;
     protected ServiceLoader<ServletContainerInitializer> _loadedInitializers = null;
+    public AnnotationConfiguration()
+    {
+        super(NAME,new String[]{PlusConfiguration.NAME},new String[]{JettyWebXmlConfiguration.NAME});
+    }
+
     /**
      * TimeStatistic
      *

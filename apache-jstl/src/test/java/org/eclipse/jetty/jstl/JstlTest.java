@@ -57,6 +57,9 @@ public class JstlTest
         // Setup WebAppContext
         File testWebAppDir = MavenTestingUtils.getProjectDir("src/test/webapp");
         
+        Configuration.addDefault(server,"org.eclipse.jetty.webapp.JettyWebXmlConfiguration");
+        Configuration.addDefault(server,"org.eclipse.jetty.annotations.AnnotationConfiguration");
+        
         // Prepare WebApp libs
         File libDir = new File(testWebAppDir, "WEB-INF/lib");
         FS.ensureDirExists(libDir);
@@ -65,12 +68,6 @@ public class JstlTest
         
         // Configure WebAppContext
  
-        Configuration.ClassList classlist = Configuration.ClassList
-                .setServerDefault(server);
-
-        classlist.addBefore(
-                "org.eclipse.jetty.webapp.JettyWebXmlConfiguration",
-                "org.eclipse.jetty.annotations.AnnotationConfiguration");
         
         WebAppContext context = new WebAppContext();
         context.setContextPath("/");
