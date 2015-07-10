@@ -38,7 +38,6 @@ import org.eclipse.jetty.server.LocalConnector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.server.handler.HandlerList;
-import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.resource.ResourceCollection;
 import org.hamcrest.Matchers;
@@ -63,9 +62,7 @@ public class WebAppContextTest
         Assert.assertThat(
             Arrays.asList(wac.getConfigurations()).stream().map(c->{return c.getClass().getName();}).collect(Collectors.toList()).toArray(new String[0]),
             Matchers.arrayContaining(WebAppContext.DEFAULT_CONFIGURATION_CLASSES));
-        
     }
-    
     
     @Test
     public void testConfigurationClassesFromServerDefault() throws Exception
@@ -99,6 +96,46 @@ public class WebAppContextTest
             Matchers.arrayContaining(configs_sorted));
         
     }
+    
+    @Test
+    public void testConfigurationClassesOverride() throws Exception
+    {
+        Server server = new Server();
+        //test if no classnames set, its the defaults
+        WebAppContext wac = new WebAppContext();
+        server.setHandler(wac);
+
+        wac.setConfigurations(new Configuration[]
+        {
+            new org.eclipse.jetty.webapp.MetaInfConfiguration(),
+            new org.eclipse.jetty.webapp.WebXmlConfiguration(),
+            new org.eclipse.jetty.webapp.JettyWebXmlConfiguration(),
+            new org.eclipse.jetty.webapp.WebInfConfiguration(),
+            new org.eclipse.jetty.webapp.MetaInfConfiguration()
+        });
+        
+        wac.addConfigurations(new org.eclipse.jetty.webapp.WebAppContextTest.OverrideWebXmlConfiguration());
+        
+        String[] configs_sorted=
+        {
+            "org.eclipse.jetty.webapp.WebInfConfiguration",
+            "org.eclipse.jetty.webapp.WebAppContextTest$OverrideWebXmlConfiguration",
+            "org.eclipse.jetty.webapp.MetaInfConfiguration",
+            "org.eclipse.jetty.webapp.JettyWebXmlConfiguration"
+        } ;
+        
+        wac.loadConfigurations();
+        Assert.assertThat(
+            Arrays.asList(wac.getConfigurations()).stream().map(c->{return c.getClass().getName();}).collect(Collectors.toList()).toArray(new String[0]),
+            Matchers.arrayContaining(configs_sorted));
+    }
+    
+    public static class OverrideWebXmlConfiguration extends WebXmlConfiguration
+    {
+        
+    }
+    
+    
     @Test
     public void testConfigurationClasses() throws Exception
     {

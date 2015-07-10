@@ -61,23 +61,6 @@
     <Set name="dumpAfterStart">false</Set>
     <Set name="dumpBeforeStop">false</Set>
 
-
-    <!-- =========================================================== -->
-    <!-- Set up the list of default configuration classes            -->
-    <!-- =========================================================== -->    
-    <Call nall class="org.eclipse.jetty.webapp.Configuration" name="addDefault">
-      <Arg><Ref refid="Server" /></Arg>
-      <Arg>
-        <Array type="String">
-          <Item>org.eclipse.jetty.osgi.boot.OSGiWebInfConfiguration</Item>
-          <Item>org.eclipse.jetty.webapp.WebXmlConfiguration</Item>
-          <Item>org.eclipse.jetty.webapp.MetaInfConfiguration</Item>
-          <Item>org.eclipse.jetty.webapp.FragmentConfiguration</Item>
-          <Item>org.eclipse.jetty.webapp.JettyWebXmlConfiguration</Item>  
-        </Array>
-     </Arg>
-    </Call>
-
     <Call class="java.lang.System" name="setProperty">
       <Arg>java.naming.factory.initial</Arg>
       <Arg><Property name="java.naming.factory.initial" default="org.eclipse.jetty.jndi.InitialContextFactory"/></Arg>
