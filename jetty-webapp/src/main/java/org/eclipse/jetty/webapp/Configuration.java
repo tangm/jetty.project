@@ -21,7 +21,9 @@ package org.eclipse.jetty.webapp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,105 +41,120 @@ public interface Configuration
 {
     public final static String ATTR="org.eclipse.jetty.webapp.configuration";
 
-    public static void addDefault(Server server, String... configurationClass)
+    /* ------------------------------------------------------------------------------- */
+    /** Set the default configurations classes for the server
+     * @param server The server to set them on.
+     * @param configurationClass Configuration class names
+     */
+    public static void setDefault(Server server, String... configurationClass)
     {
-        addDefault(server,Arrays.asList(configurationClass).stream().map(cc->
+        if (configurationClass.length==0)
+            server.setAttribute(Configuration.ATTR,null);
+        else
         {
-            Configuration c;
-            try
-            {
-                c = ((Class<? extends Configuration>)Loader.loadClass(server.getClass(),cc)).newInstance();
-                return c;
-            }
-            catch (Exception e)
-            {   
-                throw new RuntimeException(e);
-            }
-        }).collect(Collectors.toList()).toArray(new Configuration[0]));
-    }
-    
-    public static void addDefault(Server server, Configuration... configuration)
-    {
-        List<Configuration> configurations = new ArrayList<>();
-        Object attr = server.getAttribute(Configuration.ATTR);
-
-        // Look for server default as collection of strings or instances
-        Stream<? extends Object> stream=null;
-        if (attr instanceof String)
-            stream=Arrays.asList(StringUtil.csvSplit((String)attr)).stream();
-        else if (attr instanceof Collection<?>)
-            stream=((Collection<?>)attr).stream();
-        else if (attr instanceof String[])
-            stream=Arrays.asList((String[])attr).stream();
-        else if (attr instanceof Configuration[])
-            stream=Arrays.asList((Configuration[])attr).stream();
-        
-        // Add the configurations
-        if (stream!=null)
-        {
-            stream.forEach(o->
-            {
-                if (o instanceof Configuration)
-                    configurations.add((Configuration)o);
-                else
-                {
-                    try
-                    {
-                        configurations.add((Configuration)Loader.loadClass(server.getClass(), String.valueOf(o)).newInstance());
-                    }
-                    catch (Exception e)
-                    {
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
+            server.setAttribute(Configuration.ATTR,
+                    instantiate(server,Arrays.asList(configurationClass).stream()).stream()
+                    .map(c->{return c.getClass().getName();})
+                    .collect(Collectors.toList()));
         }
-        
-        configurations.addAll(Arrays.asList(configuration));
-        server.setAttribute(Configuration.ATTR,configurations);
     }
 
     /* ------------------------------------------------------------------------------- */
-    public static String[] getDefaultClasses(Server server)
+    /** Add the default configurations classes for the server.
+     * <p>If no previous default set, initialize from {@link WebAppContext#DEFAULT_CONFIGURATION_CLASSES}
+     * @param server The server to add them to.
+     * @param configurationClass Configuration class names
+     */
+    public static void addDefault(Server server, String... configurationClass)
     {
-        List<Configuration> configurations = new ArrayList<>();
-        Object attr = server.getAttribute(Configuration.ATTR);
+        if (configurationClass.length==0)
+            return;
+        server.setAttribute(Configuration.ATTR,
+                instantiate(server,Stream.concat(streamFrom(server),Arrays.asList(configurationClass).stream())).stream()
+                .map(c->{return c.getClass().getName();})
+                .collect(Collectors.toList()));
+    }
 
-        // Look for server default as collection of strings or instances
-        Stream<? extends Object> stream=null;
-        if (attr instanceof String)
-            stream=Arrays.asList(StringUtil.csvSplit((String)attr)).stream();
-        else if (attr instanceof Collection<?>)
-            stream=((Collection<?>)attr).stream();
-        else if (attr instanceof String[])
-            stream=Arrays.asList((String[])attr).stream();
-        else if (attr instanceof Configuration[])
-            stream=Arrays.asList((Configuration[])attr).stream();
+    /* ------------------------------------------------------------------------------- */
+    /** Get the default configurations for the server
+     * @param server The server 
+     * @return Configuration class names or null if no default set.
+     */
+    public static String[] getDefaults(Server server)
+    {
+        if (server.getAttribute(Configuration.ATTR)==null)
+            return null;
+        List<String> configurations = findDefaults(server);
+        return configurations.stream().map(c->{return c.getClass().getName();}).collect(Collectors.toList()).toArray(new String[configurations.size()]);
+    }
+
+    /* ------------------------------------------------------------------------------- */
+    /** Find the default configurations for the server
+     * @param server The server 
+     * @return List of Configuration instances either from {@link Configuration#ATTR} or {@link WebAppContext#DEFAULT_CONFIGURATION_CLASSES}
+     */
+    public static List<String> findDefaults(Server server)
+    {
+        return instantiate(server,streamFrom(server)).stream()
+        .map(c->{return c.getClass().getName();})
+        .collect(Collectors.toList());
+    }
+
+    /* ------------------------------------------------------------------------------- */
+    public static Collection<? extends Configuration> instantiateDefaults(Server server)
+    {
+        return instantiate(server,streamFrom(server.getAttribute(Configuration.ATTR)));
+    }
+
+    /* ------------------------------------------------------------------------------- */
+    public static List<? extends Configuration> instantiate(Server server,Stream<String> configurationClasses)
+    {
+        Map<String,Configuration> n2c = new HashMap<>();
+        
+        List<Configuration> configurations = new ArrayList<>();
         
         // Add the configurations
-        if (stream!=null)
+        configurationClasses.forEach(s->
         {
-            stream.forEach(o->
+            try
             {
-                if (o instanceof Configuration)
-                    configurations.add((Configuration)o);
+                Class<?> clazz = Loader.loadClass(server.getClass(), String.valueOf(s)); 
+                if (!Configuration.class.isAssignableFrom(clazz))
+                    throw new IllegalStateException("!Configuration: "+clazz);
+                
+                Configuration c = ((Class<? extends Configuration>)clazz).newInstance();
+                if (n2c.containsKey(c.getName()))
+                    configurations.set(configurations.indexOf(n2c.get(c.getName())),c);
                 else
-                {
-                    try
-                    {
-                        configurations.add((Configuration)Loader.loadClass(server.getClass(), String.valueOf(o)).newInstance());
-                    }
-                    catch (Exception e)
-                    {
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
-        }
+                    configurations.add(c);
+                n2c.put(c.getName(),c);
+            }
+            catch (IllegalStateException e)
+            {
+                throw e;
+            }
+            catch (Exception e)
+            {
+                throw new RuntimeException(e);
+            }
+        });
 
-        server.setAttribute(Configuration.ATTR,configurations);
-        return configurations.toArray(new String[configurations.size()]);
+        return configurations;   
+    }
+    
+    /* ------------------------------------------------------------------------------- */
+    public static Stream<String> streamFrom(Object attr)
+    {
+        if (attr==null)
+            return Arrays.asList(WebAppContext.DEFAULT_CONFIGURATION_CLASSES).stream();
+        if (attr instanceof String)
+            return Arrays.asList(StringUtil.csvSplit((String)attr)).stream();
+        if (attr instanceof Collection<?>)
+            return ((Collection<String>)attr).stream();
+        if (attr instanceof String[])
+            return Arrays.asList((String[])attr).stream();
         
+        throw new IllegalStateException("Unknown default for "+Configuration.ATTR+"="+attr);
     }
     
     /* ------------------------------------------------------------------------------- */
@@ -206,4 +223,5 @@ public interface Configuration
      * @throws Exception if unable to clone
      */
     public void cloneConfigure (WebAppContext template, WebAppContext context) throws Exception;
+
 }

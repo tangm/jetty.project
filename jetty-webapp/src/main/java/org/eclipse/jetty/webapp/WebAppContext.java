@@ -35,7 +35,6 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.servlet.ServletContext;
 import javax.servlet.ServletRegistration.Dynamic;
@@ -63,7 +62,6 @@ import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.util.AttributesMap;
 import org.eclipse.jetty.util.Loader;
 import org.eclipse.jetty.util.MultiException;
-import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.TopologicalSort;
 import org.eclipse.jetty.util.URIUtil;
 import org.eclipse.jetty.util.annotation.ManagedAttribute;
@@ -917,44 +915,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     {
         //if the configuration instances have not been set explicitly
         if (_configurations.size()==0)
-        {
-            Object attr = getServer().getAttribute(Configuration.ATTR);
-
-            // Look for server default as collection of strings or instances
-            Stream<? extends Object> stream=null;
-
-            if (attr == null)
-                stream=Arrays.asList(DEFAULT_CONFIGURATION_CLASSES).stream();
-            else if (attr instanceof String)
-                stream=Arrays.asList(StringUtil.csvSplit((String)attr)).stream();
-            else if (attr instanceof Collection<?>)
-                stream=((Collection<?>)attr).stream();
-            else if (attr instanceof String[])
-                stream=Arrays.asList((String[])attr).stream();
-            else if (attr instanceof Configuration[])
-                stream=Arrays.asList((Configuration[])attr).stream();
-            
-            // Add the configurations
-            if (stream!=null)
-            {
-                stream.forEach(o->
-                {
-                    if (o instanceof Configuration)
-                        _configurations.add((Configuration)o);
-                    else
-                    {
-                        try
-                        {
-                            _configurations.add((Configuration)Loader.loadClass(this.getClass(), String.valueOf(o)).newInstance());
-                        }
-                        catch (Exception e)
-                        {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                });
-            }
-        }
+            _configurations.addAll(Configuration.instantiateDefaults(getServer()));
         
         // Remove duplicate names while preserving order
         Map<String,Configuration> n2c = new HashMap<>();
@@ -982,8 +943,8 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
                     sort.addDependency(d,c);
             }
         }
-        
         sort.sort(_configurations);
+        
         if (LOG.isDebugEnabled())
             LOG.debug("{} configurations {}",this,_configurations);
     }
@@ -1031,7 +992,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
             throw new IllegalStateException();
         _configurations.clear();
         for (String configClass : configurations)
-            _configurations.add((Configuration)Loader.loadClass(this.getClass(), configClass).newInstance());
+            _configurations.add((Configuration)(Loader.loadClass(this.getClass(), configClass).newInstance()));
     }
     
     /* ------------------------------------------------------------ */
@@ -1051,6 +1012,24 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         _configurations.clear();
         if (configurations!=null)
             _configurations.addAll(Arrays.asList(configurations));
+    }
+    
+    /* ------------------------------------------------------------ */
+    /**
+     * @param configurations The configurations to set.
+     */
+    public void addConfigurations(Configuration... configurations)
+    {
+        if (isStarted())
+            throw new IllegalStateException();
+        
+        if (configurations.length==0)
+            return;
+        
+        if (_configurations.size()==0)
+            _configurations.addAll(Configuration.instantiateDefaults(getServer()));
+        
+        _configurations.addAll(Arrays.asList(configurations));
     }
 
     /* ------------------------------------------------------------ */

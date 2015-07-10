@@ -23,6 +23,7 @@ import java.net.URL;
 import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 
 import org.eclipse.jetty.deploy.App;
 import org.eclipse.jetty.deploy.AppProvider;
@@ -39,6 +40,7 @@ import org.eclipse.jetty.util.resource.JarResource;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.webapp.Configuration;
 import org.eclipse.jetty.webapp.WebAppContext;
+import org.eclipse.jetty.webapp.WebInfConfiguration;
 import org.eclipse.jetty.xml.XmlConfiguration;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -580,18 +582,25 @@ public abstract class AbstractWebAppProvider extends AbstractLifeCycle implement
         if (_configurationClasses != null)
             return _configurationClasses;
 
+        List<String> configurations = Configuration.findDefaults(_serverWrapper.getServer());
+        
+        configurations.replaceAll(s->
+        {
+            return WebInfConfiguration.class.getName().equals(s)?OSGiWebInfConfiguration.class.getName():s;
+        });
+        
         //add before JettyWebXmlConfiguration
         if (annotationsAvailable())
-            Configuration.addDefault(_serverWrapper.getServer(), 
-                               "org.eclipse.jetty.osgi.annotations.AnnotationConfiguration");
+            configurations.add("org.eclipse.jetty.osgi.annotations.AnnotationConfiguration");
 
         //add in EnvConfiguration and PlusConfiguration just after FragmentConfiguration
         if (jndiAvailable())
-            Configuration.addDefault(_serverWrapper.getServer(), 
-                              "org.eclipse.jetty.plus.webapp.EnvConfiguration",
-                              "org.eclipse.jetty.plus.webapp.PlusConfiguration");
+        {
+            configurations.add("org.eclipse.jetty.plus.webapp.EnvConfiguration");
+            configurations.add("org.eclipse.jetty.plus.webapp.PlusConfiguration");
+        }
         
-        return Configuration.getDefaultClasses(_serverWrapper.getServer());
+        return configurations.toArray(new String[configurations.size()]);
     }
     
 
