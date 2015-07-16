@@ -2184,7 +2184,7 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
             try
             {
                 @SuppressWarnings({ "unchecked", "rawtypes" })
-                Class<? extends EventListener> clazz = _classLoader==null?Loader.loadClass(ContextHandler.class,className):(Class)_classLoader.loadClass(className);
+                Class<? extends EventListener> clazz = _classLoader==null?Loader.loadContextClass(className):(Class)_classLoader.loadClass(className);
                 addListener(clazz);
             }
             catch (ClassNotFoundException e)

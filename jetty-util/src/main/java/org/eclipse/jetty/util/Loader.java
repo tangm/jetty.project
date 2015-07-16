@@ -110,7 +110,23 @@ public class Loader
 
         return c;
     }
-    
+
+    /* ------------------------------------------------------------ */
+    /** Load a class from the context classloader.
+     * <p>Loads a class from the thread context classloader, or the system classloader 
+     * if no thread context classloader is set.
+     * 
+     * @param name the name of the new class to load
+     * @return Class
+     * @throws ClassNotFoundException if not able to find the class
+     */
+    @SuppressWarnings("rawtypes")
+    public static Class loadContextClass(String name)
+        throws ClassNotFoundException
+    {
+        ClassLoader context_loader=Thread.currentThread().getContextClassLoader();
+        return (context_loader==null )?Class.forName(name):context_loader.loadClass(name);
+    }
     
     
     /* ------------------------------------------------------------ */
