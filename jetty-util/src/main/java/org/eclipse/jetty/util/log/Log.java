@@ -169,8 +169,8 @@ public class Log
 
             try
             {
-                Class<?> log_class = Loader.loadClass(Log.class, __logClass);
-                if (LOG == null || !LOG.getClass().equals(log_class))
+                Class<?> log_class = __logClass==null?null:Loader.loadClass(Log.class, __logClass);
+                if (LOG == null || (log_class!=null && !LOG.getClass().equals(log_class)))
                 {
                     LOG = (Logger)log_class.newInstance();
                     LOG.debug("Logging to {} via {}", LOG, log_class.getName());
@@ -209,9 +209,16 @@ public class Log
         return LOG;
     }
 
+    /**
+     * Set the root logger. 
+     * <p>Not that if any classes have statically obtained their logger instance 
+     * prior to this call, their Logger will not be affected by this call.
+     * @param log
+     */
     public static void setLog(Logger log)
     {
         Log.LOG = log;
+        __logClass=null;
     }
 
     /**

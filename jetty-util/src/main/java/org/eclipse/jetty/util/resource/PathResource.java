@@ -107,7 +107,7 @@ public class PathResource extends Resource
                  */
                 
                 int absCount = abs.getNameCount();
-                int realCount = abs.getNameCount();
+                int realCount = real.getNameCount();
                 if (absCount != realCount)
                 {
                     // different number of segments
@@ -126,7 +126,7 @@ public class PathResource extends Resource
         }
         catch (IOException e)
         {
-            // Ignore
+            LOG.ignore(e);
         }
         catch (Exception e)
         {
