@@ -68,7 +68,7 @@ public class AsyncContextState implements AsyncContext
             @Override
             public void onError(AsyncEvent event) throws IOException
             {
-                listener.onComplete(new AsyncEvent(event.getAsyncContext(),request,response,event.getThrowable()));
+                listener.onError(new AsyncEvent(event.getAsyncContext(),request,response,event.getThrowable()));
             }
             
             @Override
@@ -160,12 +160,13 @@ public class AsyncContextState implements AsyncContext
     @Override
     public void start(final Runnable task)
     {
-        state().getHttpChannel().execute(new Runnable()
+        final HttpChannel channel = state().getHttpChannel();
+        channel.execute(new Runnable()
         {
             @Override
             public void run()
             {
-                state().getAsyncContextEvent().getContext().getContextHandler().handle(task);
+                state().getAsyncContextEvent().getContext().getContextHandler().handle(channel.getRequest(),task);
             }
         });
     }

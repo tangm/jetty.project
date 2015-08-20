@@ -63,6 +63,7 @@ public class HttpConfiguration
     private boolean _sendDateHeader = true;
     private boolean _delayDispatchUntilContent = true;
     private boolean _persistentConnectionsEnabled = true;
+    private int _maxErrorDispatches = 10;
 
     /* ------------------------------------------------------------ */
     /** 
@@ -103,16 +104,22 @@ public class HttpConfiguration
     public HttpConfiguration(HttpConfiguration config)
     {
         _customizers.addAll(config._customizers);
+        for (String s:config._formEncodedMethods.keySet())
+            _formEncodedMethods.put(s,Boolean.TRUE);
         _outputBufferSize=config._outputBufferSize;
         _outputAggregationSize=config._outputAggregationSize;
         _requestHeaderSize=config._requestHeaderSize;
         _responseHeaderSize=config._responseHeaderSize;
-        _securePort=config._securePort;
+        _headerCacheSize=config._headerCacheSize;
         _secureScheme=config._secureScheme;
+        _securePort=config._securePort;
+        _blockingTimeout=config._blockingTimeout;
         _sendDateHeader=config._sendDateHeader;
         _sendServerVersion=config._sendServerVersion;
-        _headerCacheSize=config._headerCacheSize;
-        _blockingTimeout=config._blockingTimeout;
+        _sendXPoweredBy=config._sendXPoweredBy;
+        _delayDispatchUntilContent=config._delayDispatchUntilContent;
+        _persistentConnectionsEnabled=config._persistentConnectionsEnabled;
+        _maxErrorDispatches=config._maxErrorDispatches;
     }
     
     /* ------------------------------------------------------------ */
@@ -205,7 +212,7 @@ public class HttpConfiguration
      * to the total operation (as opposed to the idle timeout that applies to the time no 
      * data is being sent).
      * @return -1, for no blocking timeout (default), 0 for a blocking timeout equal to the 
-     * idle timeout; >0 for a timeout in ms applied to the total blocking operation.
+     * idle timeout; &gt;0 for a timeout in ms applied to the total blocking operation.
      */
     @ManagedAttribute("Timeout in MS for blocking operations.")
     public long getBlockingTimeout()
@@ -219,7 +226,7 @@ public class HttpConfiguration
      * to the total operation (as opposed to the idle timeout that applies to the time no 
      * data is being sent).
      * @param blockingTimeout -1, for no blocking timeout (default), 0 for a blocking timeout equal to the 
-     * idle timeout; >0 for a timeout in ms applied to the total blocking operation.
+     * idle timeout; &gt;0 for a timeout in ms applied to the total blocking operation.
      */
     public void setBlockingTimeout(long blockingTimeout)
     {
@@ -452,5 +459,24 @@ public class HttpConfiguration
     public boolean isFormEncodedMethod(String method)
     {
         return Boolean.TRUE.equals(_formEncodedMethods.get(method));
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * @return The maximum error dispatches for a request to prevent looping on an error
+     */
+    @ManagedAttribute("The maximum ERROR dispatches for a request for loop prevention (default 10)")
+    public int getMaxErrorDispatches()
+    {
+        return _maxErrorDispatches;
+    }
+
+    /* ------------------------------------------------------------ */
+    /**
+     * @param max The maximum error dispatches for a request to prevent looping on an error
+     */
+    public void setMaxErrorDispatches(int max)
+    {
+        _maxErrorDispatches=max;
     }
 }

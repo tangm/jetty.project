@@ -18,14 +18,18 @@
 
 package org.eclipse.jetty.http;
 
+import java.util.AbstractSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.function.BiFunction;
 
 import org.eclipse.jetty.util.ArrayTernaryTrie;
+import org.eclipse.jetty.util.RegexSet;
 import org.eclipse.jetty.util.Trie;
 import org.eclipse.jetty.util.URIUtil;
 
@@ -586,5 +590,49 @@ public class PathMap<O> extends HashMap<String,O>
         {
             this.mapped = mapped;
         }
+    }
+    
+    public static class PathSet extends AbstractSet<String>
+    {
+        public static final BiFunction<PathSet,String,Boolean> MATCHER=(s,e)->{return s.containsMatch(e);};
+        private final PathMap<Boolean> _map = new PathMap<>();
+        
+        @Override
+        public Iterator<String> iterator()
+        {
+            return _map.keySet().iterator();
+        }
+
+        @Override
+        public int size()
+        {
+            return _map.size();
+        }
+        
+        @Override
+        public boolean add(String item)
+        {
+            return _map.put(item,Boolean.TRUE)==null;
+        }
+        
+        @Override
+        public boolean remove(Object item)
+        {
+            return _map.remove(item)!=null;
+        }
+
+        @Override
+        public boolean contains(Object o) 
+        { 
+            return _map.containsKey(o); 
+        }
+        
+        
+        public boolean containsMatch(String s) 
+        { 
+            return _map.containsMatch(s); 
+        }
+        
+        
     }
 }

@@ -410,7 +410,7 @@ public class AsyncContextTest
         
         BufferedReader br = new BufferedReader(new StringReader(responseString));
 
-        assertEquals("HTTP/1.1 500 Async Exception",br.readLine());
+        assertEquals("HTTP/1.1 500 Server Error",br.readLine());
         br.readLine();// connection close
         br.readLine();// server
         br.readLine();// empty

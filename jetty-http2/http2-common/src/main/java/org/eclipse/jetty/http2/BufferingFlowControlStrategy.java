@@ -115,30 +115,33 @@ public class BufferingFlowControlStrategy extends AbstractFlowControlStrategy
             else
             {
                 AtomicInteger streamLevel = streamLevels.get(stream);
-                level = streamLevel.addAndGet(length);
-                maxLevel = (int)(getInitialStreamRecvWindow() * bufferRatio);
-                if (level > maxLevel)
+                if (streamLevel != null)
                 {
-                    level = streamLevel.getAndSet(0);
-                    stream.updateRecvWindow(level);
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("Data consumed, updated stream recv window by {}/{} for {}", level, maxLevel, stream);
-                    WindowUpdateFrame frame = new WindowUpdateFrame(stream.getId(), level);
-                    if (windowFrame == null)
-                        windowFrame = frame;
+                    level = streamLevel.addAndGet(length);
+                    maxLevel = (int)(getInitialStreamRecvWindow() * bufferRatio);
+                    if (level > maxLevel)
+                    {
+                        level = streamLevel.getAndSet(0);
+                        stream.updateRecvWindow(level);
+                        if (LOG.isDebugEnabled())
+                            LOG.debug("Data consumed, updated stream recv window by {}/{} for {}", level, maxLevel, stream);
+                        WindowUpdateFrame frame = new WindowUpdateFrame(stream.getId(), level);
+                        if (windowFrame == null)
+                            windowFrame = frame;
+                        else
+                            windowFrames = new Frame[]{frame};
+                    }
                     else
-                        windowFrames = new Frame[]{frame};
-                }
-                else
-                {
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("Data consumed, stream recv window level {}/{} for {}", level, maxLevel, session);
+                    {
+                        if (LOG.isDebugEnabled())
+                            LOG.debug("Data consumed, stream recv window level {}/{} for {}", level, maxLevel, session);
+                    }
                 }
             }
         }
 
         if (windowFrame != null)
-            session.frames(stream, Callback.Adapter.INSTANCE, windowFrame, windowFrames);
+            session.frames(stream, Callback.NOOP, windowFrame, windowFrames);
     }
 
     @Override

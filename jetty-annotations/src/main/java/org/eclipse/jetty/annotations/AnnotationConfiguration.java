@@ -23,6 +23,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -673,6 +674,9 @@ public class AnnotationConfiguration extends AbstractConfiguration
                 Class<?>[] classes = annotation.value();
                 if (classes != null)
                 {
+
+                    if (LOG.isDebugEnabled()){LOG.debug("HandlesTypes {} on initializer {}",Arrays.asList(classes),service.getClass());}
+                    
                     initializer = new ContainerInitializer(service, classes);
 
                     //If we haven't already done so, we need to register a handler that will
@@ -705,7 +709,7 @@ public class AnnotationConfiguration extends AbstractConfiguration
             else
             {
                 initializer = new ContainerInitializer(service, null);
-                if (LOG.isDebugEnabled()) LOG.debug("No annotation on initializer "+service.getClass());
+                if (LOG.isDebugEnabled()) LOG.debug("No HandlesTypes annotation on initializer "+service.getClass());
             }
             
             initializers.add(initializer);
@@ -937,7 +941,7 @@ public class AnnotationConfiguration extends AbstractConfiguration
         {
             int i=0;
             for (ServletContainerInitializer sci:nonExcludedInitializers)
-                LOG.debug("ServletContainerInitializer: {} {}",(++i), sci.getClass().getName());
+                LOG.debug("ServletContainerInitializer: {} {} from {}",(++i), sci.getClass().getName(), sciResourceMap.get(sci));
         }
         return nonExcludedInitializers;
     }

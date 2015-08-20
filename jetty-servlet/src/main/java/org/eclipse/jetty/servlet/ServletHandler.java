@@ -142,7 +142,7 @@ public class ServletHandler extends ScopedHandler
         throws Exception
     {
         ContextHandler.Context context=ContextHandler.getCurrentContext();
-        _servletContext=context==null?new ContextHandler.NoContext():context;
+        _servletContext=context==null?new ContextHandler.StaticContext():context;
         _contextHandler=(ServletContextHandler)(context==null?null:context.getContextHandler());
 
         if (_contextHandler!=null)
@@ -598,7 +598,9 @@ public class ServletHandler extends ScopedHandler
         }
         catch(Exception e)
         {
-            if (!(DispatcherType.REQUEST.equals(type) || DispatcherType.ASYNC.equals(type)))
+            //TODO, can we let all error handling fall through to HttpChannel?
+            
+            if (baseRequest.isAsyncStarted() || !(DispatcherType.REQUEST.equals(type) || DispatcherType.ASYNC.equals(type)))
             {
                 if (e instanceof IOException)
                     throw (IOException)e;

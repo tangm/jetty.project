@@ -25,9 +25,12 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 
+import javax.servlet.jsp.JspException;
+
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.toolchain.test.FS;
+import org.eclipse.jetty.toolchain.test.JAR;
 import org.eclipse.jetty.toolchain.test.MavenTestingUtils;
 import org.eclipse.jetty.toolchain.test.SimpleRequest;
 import org.eclipse.jetty.webapp.Configuration;
@@ -37,7 +40,6 @@ import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
-@Ignore
 public class JstlTest
 {
     private static Server server;
@@ -54,10 +56,17 @@ public class JstlTest
         
         // Setup WebAppContext
         File testWebAppDir = MavenTestingUtils.getProjectDir("src/test/webapp");
- 
+        
         Configuration.addDefault(server,"org.eclipse.jetty.webapp.JettyWebXmlConfiguration");
         Configuration.addDefault(server,"org.eclipse.jetty.annotations.AnnotationConfiguration");
         
+        // Prepare WebApp libs
+        File libDir = new File(testWebAppDir, "WEB-INF/lib");
+        FS.ensureDirExists(libDir);
+        File testTagLibDir = MavenTestingUtils.getProjectDir("src/test/taglibjar");
+        JAR.create(testTagLibDir,new File(libDir, "testtaglib.jar"));
+        
+        // Configure WebAppContext
         WebAppContext context = new WebAppContext();
         context.setContextPath("/");
         
@@ -94,8 +103,27 @@ public class JstlTest
         assertThat("Response should be JSP processed", resp, not(containsString("<c:url")));
         assertThat("Response", resp, containsString("[c:url value] = /ref.jsp;jsessionid="));
         assertThat("Response", resp, containsString("[c:url param] = ref.jsp;key=value;jsessionid="));
-        
-        System.err.println("Response:");
-        System.err.println(resp);
+    }
+    
+    @Test
+    public void testCatchBasic() throws IOException
+    {
+        SimpleRequest req = new SimpleRequest(baseUri);
+        String resp = req.getString("/catch-basic.jsp");
+        assertThat("Response should be JSP processed", resp, not(containsString("<c:catch")));
+        assertThat("Response", resp, containsString("[c:catch] exception : " + JspException.class.getName()));
+        assertThat("Response", resp, containsString("[c:catch] exception.message : In &lt;parseNumber&gt;"));
+    }
+    
+    @Test
+    @Ignore
+    public void testCatchTaglib() throws IOException
+    {
+        SimpleRequest req = new SimpleRequest(baseUri);
+        String resp = req.getString("/catch-taglib.jsp");
+        System.out.println("resp = " + resp);
+        assertThat("Response should be JSP processed", resp, not(containsString("<c:catch>")));
+        assertThat("Response should be JSP processed", resp, not(containsString("<jtest:errorhandler>")));
+        assertThat("Response", resp, not(containsString("[jtest:errorhandler] exception is null")));
     }
 }
