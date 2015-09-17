@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.Stack;
 
 import javax.servlet.MultipartConfigElement;
-import javax.servlet.RequestDispatcher;
 import javax.servlet.Servlet;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
@@ -798,7 +797,6 @@ public class ServletHolder extends Holder<Servlet> implements UserIdentity.Scope
         Servlet servlet = ensureInstance();
 
         // Service the request
-        boolean servlet_error=true;
         Object old_run_as = null;
         boolean suspendable = baseRequest.isAsyncSupported();
         try
@@ -815,7 +813,6 @@ public class ServletHolder extends Holder<Servlet> implements UserIdentity.Scope
                 baseRequest.setAsyncSupported(false);
 
             servlet.service(request,response);
-            servlet_error=false;
         }
         catch(UnavailableException e)
         {
@@ -826,13 +823,9 @@ public class ServletHolder extends Holder<Servlet> implements UserIdentity.Scope
         {
             baseRequest.setAsyncSupported(suspendable);
 
-            // pop run-as role
+            // Pop run-as role.
             if (_identityService!=null)
                 _identityService.unsetRunAs(old_run_as);
-
-            // Handle error params.
-            if (servlet_error)
-                request.setAttribute(RequestDispatcher.ERROR_SERVLET_NAME,getName());
         }
     }
 
