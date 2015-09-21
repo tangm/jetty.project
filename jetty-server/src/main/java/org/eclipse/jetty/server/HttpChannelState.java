@@ -82,10 +82,10 @@ public class HttpChannelState
         STARTED,          // AsyncContext.startAsync() has been called
         DISPATCH,         // AsyncContext.dispatch() has been called
         COMPLETE,         // AsyncContext.complete() has been called
-        TIMEOUT,          // AsyncContext timeout just happened
+        EXPIRING,         // AsyncContext timeout just happened
         EXPIRED,          // AsyncContext timeout has been processed
-        ERROR,            // An error just happened
-        FAILED            // The error has been processed
+        ERRORING,         // An error just happened
+        ERRORED           // The error has been processed
     }
 
     private final boolean DEBUG = LOG.isDebugEnabled();
@@ -225,7 +225,7 @@ public class HttpChannelState
                                 _state = State.DISPATCHED;
                                 _async = null;
                                 return Action.ASYNC_DISPATCH;
-                            case TIMEOUT:
+                            case EXPIRING:
                                 break;
                             case EXPIRED:
                                 _state = State.DISPATCHED;
@@ -233,7 +233,7 @@ public class HttpChannelState
                                 return Action.ERROR_DISPATCH;
                             case STARTED:
                                 return Action.WAIT;
-                            case ERROR:
+                            case ERRORING:
                                 _state = State.DISPATCHED;
                                 return Action.ASYNC_ERROR;
 
@@ -316,7 +316,7 @@ public class HttpChannelState
         {
             if (_event != null)
                 _event.addThrowable(failure);
-            _async = Async.ERROR;
+            _async = Async.ERRORING;
         }
     }
 
@@ -324,7 +324,6 @@ public class HttpChannelState
      * Signal that the HttpConnection has finished handling the request.
      * For blocking connectors, this call may block if the request has
      * been suspended (startAsync called).
-     *
      * @return next actions
      * be handled again (eg because of a resume that happened before unhandle was called)
      */
@@ -398,18 +397,18 @@ public class HttpChannelState
                         }
                         break;
 
-                    case TIMEOUT:
+                    case EXPIRING:
                         schedule_event = _event;
                         _state = State.ASYNC_WAIT;
                         action = Action.WAIT;
                         break;
 
-                    case ERROR:
+                    case ERRORING:
                         _state = State.DISPATCHED;
                         action = Action.ASYNC_ERROR;
                         break;
 
-                    case FAILED:
+                    case ERRORED:
                         _state = State.DISPATCHED;
                         action = Action.ERROR_DISPATCH;
                         break;
@@ -447,9 +446,9 @@ public class HttpChannelState
                 case STARTED:
                     started = true;
                     break;
-                case TIMEOUT:
-                case ERROR:
-                case FAILED:
+                case EXPIRING:
+                case ERRORING:
+                case ERRORED:
                     break;
                 default:
                     throw new IllegalStateException(this.getStatusStringLocked());
@@ -493,7 +492,7 @@ public class HttpChannelState
         {
             if (_async != Async.STARTED)
                 return;
-            _async = Async.TIMEOUT;
+            _async = Async.EXPIRING;
             event = _event;
             listeners = _asyncListeners;
 
@@ -539,8 +538,8 @@ public class HttpChannelState
         {
             switch (_async)
             {
-                case TIMEOUT:
-                    _async = event.getThrowable() == null ? Async.EXPIRED : Async.ERROR;
+                case EXPIRING:
+                    _async = event.getThrowable() == null ? Async.EXPIRED : Async.ERRORING;
                     break;
 
                 case COMPLETE:
@@ -581,9 +580,9 @@ public class HttpChannelState
                 case STARTED:
                     started = true;
                     break;
-                case TIMEOUT:
-                case ERROR:
-                case FAILED:
+                case EXPIRING:
+                case ERRORING:
+                case ERRORED:
                     break;
                 case COMPLETE:
                     return;
@@ -672,11 +671,11 @@ public class HttpChannelState
         {
             switch (_async)
             {
-                case ERROR:
+                case ERRORING:
                 {
                     // Still in this state ? The listeners did not invoke API methods
                     // and the container must provide a default error dispatch.
-                    _async = Async.FAILED;
+                    _async = Async.ERRORED;
                     break;
                 }
                 case DISPATCH:
@@ -742,9 +741,9 @@ public class HttpChannelState
                             {
                                 listener.onComplete(event);
                             }
-                            catch (Exception x)
+                            catch(Exception e)
                             {
-                                LOG.info("Exception while invoking listener " + listener, x);
+                                LOG.warn("Exception while invoking listener " + listener, e);
                             }
                         }
                     }
@@ -894,7 +893,7 @@ public class HttpChannelState
         {
             if (_state == State.DISPATCHED)
                 return _async != null;
-            return _async == Async.STARTED || _async == Async.TIMEOUT;
+            return _async == Async.STARTED || _async == Async.EXPIRING;
         }
     }
 
@@ -978,8 +977,9 @@ public class HttpChannelState
         _channel.getRequest().setAttribute(name, attribute);
     }
 
-    /**
-     * Called to signal async read isReady() has returned false.
+    
+    /* ------------------------------------------------------------ */
+    /** Called to signal async read isReady() has returned false.
      * This indicates that there is no content available to be consumed
      * and that once the channel enteres the ASYNC_WAIT state it will
      * register for read interest by calling {@link HttpChannel#asyncReadFillInterested()}
@@ -1005,13 +1005,10 @@ public class HttpChannelState
     }
 
     /* ------------------------------------------------------------ */
-
-    /**
-     * Called to signal that content is now available to read.
+    /** Called to signal that content is now available to read.
      * If the channel is in ASYNC_WAIT state and unready (ie isReady() has
      * returned false), then the state is changed to ASYNC_WOKEN and true
      * is returned.
-     *
      * @return True IFF the channel was unready and in ASYNC_WAIT state
      */
     public boolean onReadPossible()
@@ -1029,12 +1026,11 @@ public class HttpChannelState
         return woken;
     }
 
-    /**
-     * Called to signal that the channel is ready for a callback.
+    /* ------------------------------------------------------------ */
+    /** Called to signal that the channel is ready for a callback.
      * This is similar to calling {@link #onReadUnready()} followed by
      * {@link #onReadPossible()}, except that as content is already
      * available, read interest is never set.
-     *
      * @return true if woken
      */
     public boolean onReadReady()
