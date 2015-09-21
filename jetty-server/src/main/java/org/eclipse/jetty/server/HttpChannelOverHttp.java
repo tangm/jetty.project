@@ -424,10 +424,10 @@ class HttpChannelOverHttp extends HttpChannel implements HttpParser.RequestHandl
     }
 
     @Override
-    protected void handleException(Throwable failure)
+    protected void handleException(Throwable x)
     {
         _httpConnection.getGenerator().setPersistent(false);
-        super.handleException(failure);
+        super.handleException(x);
     }
 
     @Override
