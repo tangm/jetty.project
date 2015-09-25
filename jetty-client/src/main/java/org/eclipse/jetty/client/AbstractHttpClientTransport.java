@@ -19,7 +19,9 @@
 package org.eclipse.jetty.client;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.net.SocketException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
@@ -85,7 +87,7 @@ public abstract class AbstractHttpClientTransport extends ContainerLifeCycle imp
     }
 
     @Override
-    public void connect(SocketAddress address, Map<String, Object> context)
+    public void connect(InetSocketAddress address, Map<String, Object> context)
     {
         SocketChannel channel = null;
         try
@@ -120,6 +122,11 @@ public abstract class AbstractHttpClientTransport extends ContainerLifeCycle imp
         // UnresolvedAddressException are not IOExceptions.
         catch (Throwable x)
         {
+            // If IPv6 is not deployed, a generic SocketException "Network is unreachable"
+            // exception is being thrown, so we attempt to provide a better error message.
+            if (x.getClass() == SocketException.class)
+                x = new SocketException("Could not connect to " + address).initCause(x);
+
             try
             {
                 if (channel != null)

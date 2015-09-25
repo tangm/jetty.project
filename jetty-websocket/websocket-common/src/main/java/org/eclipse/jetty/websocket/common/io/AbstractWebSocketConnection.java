@@ -244,10 +244,14 @@ public abstract class AbstractWebSocketConnection extends AbstractConnection imp
         return super.getExecutor();
     }
 
+    /**
+     * Close without a close code or reason
+     */
     @Override
     public void close()
     {
-        close(StatusCode.NORMAL,null);
+        CloseInfo close = new CloseInfo();
+        this.outgoingFrame(close.asFrame(),new OnCloseLocalCallback(close),BatchMode.OFF);
     }
 
     /**
@@ -413,7 +417,7 @@ public abstract class AbstractWebSocketConnection extends AbstractConnection imp
         if (LOG.isDebugEnabled())
             LOG.debug("{} onClose()",policy.getBehavior());
         super.onClose();
-        // ioState.onDisconnected();
+        ioState.onDisconnected();
         flusher.close();
     }
 

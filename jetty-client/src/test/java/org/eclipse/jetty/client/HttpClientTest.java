@@ -22,10 +22,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpCookie;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.UnresolvedAddressException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -77,6 +81,8 @@ import org.eclipse.jetty.toolchain.test.annotation.Slow;
 import org.eclipse.jetty.util.Callback;
 import org.eclipse.jetty.util.FuturePromise;
 import org.eclipse.jetty.util.IO;
+import org.eclipse.jetty.util.Promise;
+import org.eclipse.jetty.util.SocketAddressResolver;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -324,7 +330,7 @@ public class HttpClientTest extends AbstractHttpClientServerTest
             public void handle(String target, org.eclipse.jetty.server.Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException
             {
                 baseRequest.setHandled(true);
-                consume(request.getInputStream());
+                consume(request.getInputStream(), true);
                 String value = request.getParameter(paramName);
                 if (paramValue.equals(value))
                 {
@@ -355,7 +361,7 @@ public class HttpClientTest extends AbstractHttpClientServerTest
             public void handle(String target, org.eclipse.jetty.server.Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException
             {
                 baseRequest.setHandled(true);
-                consume(request.getInputStream());
+                consume(request.getInputStream(), true);
             }
         });
 
@@ -389,7 +395,7 @@ public class HttpClientTest extends AbstractHttpClientServerTest
             public void handle(String target, org.eclipse.jetty.server.Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException
             {
                 baseRequest.setHandled(true);
-                consume(request.getInputStream());
+                consume(request.getInputStream(), true);
             }
         });
 
@@ -852,7 +858,7 @@ public class HttpClientTest extends AbstractHttpClientServerTest
     }
 
     @Test
-    public void testConnectThrowsUnresolvedAddressException() throws Exception
+    public void testConnectThrowsUnknownHostException() throws Exception
     {
         start(new EmptyServerHandler());
 
@@ -864,11 +870,60 @@ public class HttpClientTest extends AbstractHttpClientServerTest
                     public void onComplete(Result result)
                     {
                         Assert.assertTrue(result.isFailed());
-                        Assert.assertTrue(result.getFailure() instanceof UnresolvedAddressException);
+                        Throwable failure = result.getFailure();
+                        Assert.assertTrue(failure instanceof UnknownHostException);
                         latch.countDown();
                     }
                 });
         Assert.assertTrue(latch.await(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void testConnectHostWithMultipleAddresses() throws Exception
+    {
+        String host = "google.com";
+        try
+        {
+            // Likely that the DNS for google.com returns multiple addresses.
+            Assume.assumeTrue(InetAddress.getAllByName(host).length > 1);
+        }
+        catch (Throwable x)
+        {
+            Assume.assumeNoException(x);
+        }
+
+        startClient();
+        client.setFollowRedirects(false); // Avoid redirects from 80 to 443.
+        client.setSocketAddressResolver(new SocketAddressResolver.Async(client.getExecutor(), client.getScheduler(), client.getConnectTimeout())
+        {
+            @Override
+            public void resolve(String host, int port, Promise<List<InetSocketAddress>> promise)
+            {
+                super.resolve(host, port, new Promise<List<InetSocketAddress>>()
+                {
+                    @Override
+                    public void succeeded(List<InetSocketAddress> result)
+                    {
+                        // Add as first address an invalid address so that we test
+                        // that the connect operation iterates over the addresses.
+                        result.add(0, new InetSocketAddress("idontexist", 80));
+                        promise.succeeded(result);
+                    }
+
+                    @Override
+                    public void failed(Throwable x)
+                    {
+                        promise.failed(x);
+                    }
+                });
+            }
+        });
+
+        // Response code may be 200 or 302;
+        // if no exceptions the test passes.
+        client.newRequest(host, 80)
+                .header(HttpHeader.CONNECTION, "close")
+                .send();
     }
 
     @Test
@@ -1364,7 +1419,7 @@ public class HttpClientTest extends AbstractHttpClientServerTest
                 int count = requests.incrementAndGet();
                 if (count == maxRetries)
                     baseRequest.setHandled(true);
-                consume(request.getInputStream());
+                consume(request.getInputStream(), true);
             }
         });
 
@@ -1430,11 +1485,73 @@ public class HttpClientTest extends AbstractHttpClientServerTest
         Assert.assertTrue(completeLatch.await(5, TimeUnit.SECONDS));
     }
 
-    private void consume(InputStream input) throws IOException
+    @Test
+    public void testCONNECTWithHTTP10() throws Exception
     {
+        try (ServerSocket server = new ServerSocket(0))
+        {
+            startClient();
+
+            String host = "localhost";
+            int port = server.getLocalPort();
+
+            Request request = client.newRequest(host, port)
+                    .method(HttpMethod.CONNECT)
+                    .version(HttpVersion.HTTP_1_0);
+            FuturePromise<Connection> promise = new FuturePromise<>();
+            client.getDestination("http", host, port).newConnection(promise);
+            Connection connection = promise.get(5, TimeUnit.SECONDS);
+            FutureResponseListener listener = new FutureResponseListener(request);
+            connection.send(request, listener);
+
+            try (Socket socket = server.accept())
+            {
+                InputStream input = socket.getInputStream();
+                consume(input, false);
+
+                // HTTP/1.0 response, the client must not close the connection.
+                String httpResponse = "" +
+                        "HTTP/1.0 200 OK\r\n" +
+                        "\r\n";
+                OutputStream output = socket.getOutputStream();
+                output.write(httpResponse.getBytes(StandardCharsets.UTF_8));
+                output.flush();
+
+                ContentResponse response = listener.get(5, TimeUnit.SECONDS);
+                Assert.assertEquals(200, response.getStatus());
+
+                // Test that I can send another request on the same connection.
+                request = client.newRequest(host, port);
+                listener = new FutureResponseListener(request);
+                connection.send(request, listener);
+
+                consume(input, false);
+
+                httpResponse = "" +
+                        "HTTP/1.1 200 OK\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "\r\n";
+                output.write(httpResponse.getBytes(StandardCharsets.UTF_8));
+                output.flush();
+
+                listener.get(5, TimeUnit.SECONDS);
+            }
+        }
+    }
+
+    private void consume(InputStream input, boolean eof) throws IOException
+    {
+        int crlfs = 0;
         while (true)
         {
-            if (input.read() < 0)
+            int read = input.read();
+            if (read == '\r' || read == '\n')
+                ++crlfs;
+            else
+                crlfs = 0;
+            if (!eof && crlfs == 4)
+                break;
+            if (read < 0)
                 break;
         }
     }
