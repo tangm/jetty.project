@@ -333,10 +333,24 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
                             else
                                 code = HttpStatus.SERVICE_UNAVAILABLE_503;
                         }
-
+                        _response.setStatus(code);
+                        _request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE,code);
+                        if (reason!=null)
+                            _request.setAttribute(RequestDispatcher.ERROR_MESSAGE,reason);
+                        _request.setHandled(false);
+                        _response.getHttpOutput().reopen();
                         _request.setDispatcherType(DispatcherType.ERROR);
-
-                        sendError(code, reason);
+                        
+                        try
+                        {
+                            getServer().handle(this);
+                        }
+                        catch(Throwable th)
+                        {
+                            LOG.warn("Exception thrown from ERROR_DISPATH: ",th);
+                            _request.setHandled(true);
+                            _transport.abort(th);
+                        }
                         break;
                     }
 

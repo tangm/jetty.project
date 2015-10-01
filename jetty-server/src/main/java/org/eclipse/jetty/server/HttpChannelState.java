@@ -50,6 +50,7 @@ public class HttpChannelState
     {
         IDLE,             // Idle request
         DISPATCHED,       // Request dispatched to filter/servlet
+        ERRORED,          // Error thrown from DISPATCHED
         ASYNC_WAIT,       // Suspended and waiting
         ASYNC_WOKEN,      // Dispatch to handle from ASYNC_WAIT
         ASYNC_IO,         // Dispatched for async IO
@@ -244,6 +245,10 @@ public class HttpChannelState
 
                     return Action.WAIT;
 
+                case ERRORED:
+                    _state=State.DISPATCHED;
+                    return Action.ERROR_DISPATCH;
+                    
                 case ASYNC_IO:
                 case ASYNC_WAIT:
                 case DISPATCHED:
@@ -315,7 +320,12 @@ public class HttpChannelState
         {
             if(_event!=null)
                 _event.addThrowable(failure);
-            _async=Async.ERRORING;
+            if (_async!=null)
+                _async=Async.ERRORING;
+            else if (_state==State.DISPATCHED)
+                _state=State.ERRORED;
+            else 
+                throw new IllegalStateException();
         }
     }
 
@@ -343,6 +353,10 @@ public class HttpChannelState
                 case COMPLETED:
                     return Action.TERMINATED;
 
+                case ERRORED:
+                    _state=State.DISPATCHED;
+                    return Action.ERROR_DISPATCH;
+                    
                 case DISPATCHED:
                 case ASYNC_IO:
                     break;
@@ -673,7 +687,8 @@ public class HttpChannelState
                 {
                     // Still in this state ? The listeners did not invoke API methods
                     // and the container must provide a default error dispatch.
-                    _async=Async.ERRORED;
+                    _async=null;
+                    _state=State.ERRORED;
                     break;
                 }
                 case DISPATCH:
