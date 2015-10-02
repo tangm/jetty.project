@@ -18,6 +18,10 @@
 
 package org.eclipse.jetty.server;
 
+import static javax.servlet.RequestDispatcher.ERROR_EXCEPTION;
+import static javax.servlet.RequestDispatcher.ERROR_MESSAGE;
+import static javax.servlet.RequestDispatcher.ERROR_STATUS_CODE;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -316,40 +320,24 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
 
                     case ERROR_DISPATCH:
                     {
-                        Throwable failure = (Throwable)_request.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
-
-                        int code = HttpStatus.INTERNAL_SERVER_ERROR_500;
-                        String reason = null;
-                        if (failure instanceof BadMessageException)
+                        if (_response.isCommitted())
                         {
-                            BadMessageException bme = (BadMessageException)failure;
-                            code = bme.getCode();
-                            reason = bme.getReason();
+                            LOG.warn("Error Dispatch already committed");
+                            _transport.abort((Throwable)_request.getAttribute(ERROR_EXCEPTION));
                         }
-                        else if (failure instanceof UnavailableException)
+                        else
                         {
-                            if (((UnavailableException)failure).isPermanent())
-                                code = HttpStatus.NOT_FOUND_404;
-                            else
-                                code = HttpStatus.SERVICE_UNAVAILABLE_503;
-                        }
-                        _response.setStatus(code);
-                        _request.setAttribute(RequestDispatcher.ERROR_STATUS_CODE,code);
-                        if (reason!=null)
-                            _request.setAttribute(RequestDispatcher.ERROR_MESSAGE,reason);
-                        _request.setHandled(false);
-                        _response.getHttpOutput().reopen();
-                        _request.setDispatcherType(DispatcherType.ERROR);
-                        
-                        try
-                        {
+                            _response.reset();
+                            Integer icode = (Integer)_request.getAttribute(ERROR_STATUS_CODE);
+                            int code = icode!=null?icode.intValue():HttpStatus.INTERNAL_SERVER_ERROR_500;                        
+                            _response.setStatus(code);
+                            _request.setAttribute(ERROR_STATUS_CODE,code);
+                            if (icode==null)
+                                _request.setAttribute(ERROR_STATUS_CODE,code);
+                            _request.setHandled(false);
+                            _response.getHttpOutput().reopen();
+                            _request.setDispatcherType(DispatcherType.ERROR);
                             getServer().handle(this);
-                        }
-                        catch(Throwable th)
-                        {
-                            LOG.warn("Exception thrown from ERROR_DISPATH: ",th);
-                            _request.setHandled(true);
-                            _transport.abort(th);
                         }
                         break;
                     }
@@ -371,12 +359,6 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
                             handler.handle(_request,_response.getHttpOutput());
                         else
                             _response.getHttpOutput().run();
-                        break;
-                    }
-
-                    case ASYNC_ERROR:
-                    {
-                        _state.onError();
                         break;
                     }
 
@@ -452,9 +434,6 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
         if (failure instanceof RuntimeIOException)
             failure = failure.getCause();
 
-        _request.setAttribute(RequestDispatcher.ERROR_EXCEPTION, failure);
-        _request.setAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE, failure.getClass());
-
         if (failure instanceof QuietServletException || !getServer().isRunning())
         {
             if (LOG.isDebugEnabled())
@@ -465,56 +444,37 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
             LOG.info(_request.getRequestURI(), failure);
         }
 
-        _state.error(failure);
-
-/*
-        if (_state.isAsyncStarted())
-        {
-            _state.error(failure);
-        }
-        else
+        try
         {
             try
             {
-                // Handle error normally
-                _request.setHandled(true);
-
-                if (isCommitted())
+                _state.onError(failure);
+            }
+            catch (Exception e)
+            {
+                LOG.warn(e);
+                // Error could not be handled, probably due to error thrown from error dispatch
+                if (_response.isCommitted())
                 {
-                    abort(failure);
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("Could not send response error 500, already committed", failure);
+                    LOG.warn("ERROR Dispatch failed: ",failure);
+                    _transport.abort(failure);
                 }
                 else
                 {
-                    _response.setHeader(HttpHeader.CONNECTION.asString(), HttpHeaderValue.CLOSE.asString());
-
-                    if (failure instanceof BadMessageException)
-                    {
-                        BadMessageException bme = (BadMessageException)failure;
-                        _response.sendError(bme.getCode(), bme.getReason());
-                    }
-                    else if (failure instanceof UnavailableException)
-                    {
-                        if (((UnavailableException)failure).isPermanent())
-                            _response.sendError(HttpStatus.NOT_FOUND_404);
-                        else
-                            _response.sendError(HttpStatus.SERVICE_UNAVAILABLE_503);
-                    }
-                    else
-                    {
-                        _response.sendError(HttpStatus.INTERNAL_SERVER_ERROR_500);
-                    }
+                    // Minimal response
+                    Integer code=(Integer)_request.getAttribute(ERROR_STATUS_CODE);
+                    _response.reset();
+                    _response.setStatus(code==null?500:code.intValue());
+                    _response.flushBuffer();
                 }
             }
-            catch (Throwable e)
-            {
-                abort(e);
-                if (LOG.isDebugEnabled())
-                    LOG.debug("Could not commit response error 500", e);
-            }
         }
-*/
+        catch(Exception e)
+        {
+            failure.addSuppressed(e);
+            LOG.warn("ERROR Dispatch failed: ",failure);
+            _transport.abort(failure);
+        }
     }
 
     public boolean isExpecting100Continue()

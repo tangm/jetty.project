@@ -103,10 +103,16 @@ public class AsyncServletTest
         context.setContextPath("/ctx");
         logHandler.setHandler(context);
         context.addEventListener(new DebugListener());
+        
+        ErrorPageErrorHandler errorHandler = new ErrorPageErrorHandler();
+        context.setErrorHandler(errorHandler);
+        errorHandler.addErrorPage(300,599,"/error");
+        
 
         _servletHandler=context.getServletHandler();
         ServletHolder holder=new ServletHolder(_servlet);
         holder.setAsyncSupported(true);
+        _servletHandler.addServletWithMapping(holder,"/error/*");
         _servletHandler.addServletWithMapping(holder,"/path/*");
         _servletHandler.addServletWithMapping(holder,"/path1/*");
         _servletHandler.addServletWithMapping(holder,"/path2/*");
@@ -169,7 +175,7 @@ public class AsyncServletTest
     {
         _expectedCode="500 ";
         String response=process("start=200",null);
-        Assert.assertThat(response,Matchers.startsWith("HTTP/1.1 500 Async Timeout"));
+        Assert.assertThat(response,Matchers.startsWith("HTTP/1.1 500 Server Error"));
         assertThat(__history,contains(
             "REQUEST /ctx/path/info",
             "initial",
@@ -399,7 +405,7 @@ public class AsyncServletTest
     {
         _expectedCode="500 ";
         String response=process("start=1000&dispatch=10&start2=10",null);
-        assertEquals("HTTP/1.1 500 Async Timeout",response.substring(0,26));
+        assertEquals("HTTP/1.1 500 Server Error",response.substring(0,26));
         assertThat(__history,contains(
             "REQUEST /ctx/path/info",
             "initial",

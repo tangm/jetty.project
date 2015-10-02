@@ -1175,7 +1175,7 @@ public class Response implements HttpServletResponse
 
     protected MetaData.Response newResponseMetaData()
     {
-        return new MetaData.Response(_channel.getRequest().getHttpVersion(), getStatus(), getReason(), _fields, getLongContentLength());
+        return new MetaData.Response(_channel.getRequest().getHttpVersion(), getStatus(), null, _fields, getLongContentLength());
     }
 
     /** Get the MetaData.Response committed for this response.

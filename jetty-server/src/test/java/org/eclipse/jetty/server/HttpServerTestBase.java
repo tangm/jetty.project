@@ -244,7 +244,7 @@ public abstract class HttpServerTestBase extends HttpServerTestFixture
     }
 
     @Test
-    public void testExceptionThrownInHandler() throws Exception
+    public void testExceptionThrownInHandlerLoop() throws Exception
     {
         configureServer(new AbstractHandler()
         {
@@ -269,7 +269,41 @@ public abstract class HttpServerTestBase extends HttpServerTestFixture
             os.flush();
 
             String response = readResponse(client);
-            assertThat("response code is 500", response.contains("500"), is(true));
+            assertThat(response,Matchers.containsString(" 500 "));
+        }
+        finally
+        {
+            ((StdErrLog)Log.getLogger(HttpChannel.class)).setHideStacks(false);
+        }
+    }
+    
+    @Test
+    public void testExceptionThrownInHandler() throws Exception
+    {
+        configureServer(new AbstractHandler()
+        {
+            @Override
+            public void doHandle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException
+            {
+                throw new QuietServletException("TEST handler exception");
+            }
+        });
+
+        StringBuffer request = new StringBuffer("GET / HTTP/1.0\r\n");
+        request.append("Host: localhost\r\n\r\n");
+
+        Socket client = newSocket(_serverURI.getHost(), _serverURI.getPort());
+        OutputStream os = client.getOutputStream();
+
+        try
+        { 
+            ((StdErrLog)Log.getLogger(HttpChannel.class)).setHideStacks(true);
+            Log.getLogger(HttpChannel.class).info("Expecting ServletException: TEST handler exception...");
+            os.write(request.toString().getBytes());
+            os.flush();
+
+            String response = readResponse(client);
+            assertThat(response,Matchers.containsString(" 500 "));
         }
         finally
         {
