@@ -319,7 +319,7 @@ public abstract class HttpServerTestBase extends HttpServerTestFixture
         configureServer(new AbstractHandler()
         {
             @Override
-            public void handle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException
+            public void doHandle(String target, Request baseRequest, HttpServletRequest request, HttpServletResponse response) throws IOException, ServletException
             {
                 baseRequest.setHandled(true);
                 int contentLength = request.getContentLength();
@@ -333,7 +333,7 @@ public abstract class HttpServerTestBase extends HttpServerTestFixture
                     catch (EofException e)
                     {
                         earlyEOFException.set(true);
-                        throw e;
+                        throw new QuietServletException(e);
                     }
                     if (i == 3)
                         fourBytesRead.set(true);

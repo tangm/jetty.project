@@ -1153,6 +1153,10 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
                     break;
                     
                 case ERROR:
+                    // If this is already a dispatch to an error page, proceed normally
+                    if (Boolean.TRUE.equals(baseRequest.getAttribute(Dispatcher.__ERROR_DISPATCH)))
+                        break;
+                    
                     Object error = request.getAttribute(Dispatcher.ERROR_STATUS_CODE);
                     // We can just call sendError here.  If there is no error page, then one will
                     // be generated. If there is an error page, then a RequestDispatcher will be

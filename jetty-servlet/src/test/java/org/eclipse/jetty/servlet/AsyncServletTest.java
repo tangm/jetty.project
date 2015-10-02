@@ -405,7 +405,7 @@ public class AsyncServletTest
     {
         _expectedCode="500 ";
         String response=process("start=1000&dispatch=10&start2=10",null);
-        assertEquals("HTTP/1.1 500 Server Error",response.substring(0,26));
+        assertThat(response,startsWith("HTTP/1.1 500 Server Error"));
         assertThat(__history,contains(
             "REQUEST /ctx/path/info",
             "initial",

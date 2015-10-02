@@ -41,6 +41,8 @@ import org.eclipse.jetty.util.MultiMap;
 
 public class Dispatcher implements RequestDispatcher
 {
+    public final static String __ERROR_DISPATCH="org.eclipse.jetty.server.Dispatcher.ERROR";
+    
     /** Dispatch include attribute names */
     public final static String __INCLUDE_PREFIX="javax.servlet.include.";
 
@@ -76,7 +78,15 @@ public class Dispatcher implements RequestDispatcher
 
     public void error(ServletRequest request, ServletResponse response) throws ServletException, IOException
     {
-        forward(request, response, DispatcherType.ERROR);
+        try
+        {
+            request.setAttribute(__ERROR_DISPATCH,Boolean.TRUE);
+            forward(request, response, DispatcherType.ERROR);
+        }
+        finally
+        {
+            request.setAttribute(__ERROR_DISPATCH,null);
+        }
     }
 
     @Override
