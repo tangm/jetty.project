@@ -551,8 +551,12 @@ public class Response implements HttpServletResponse
         Request request = _channel.getRequest();
         Throwable cause = (Throwable)request.getAttribute(Dispatcher.ERROR_EXCEPTION);
         if (message==null)
-            message=cause==null?HttpStatus.getMessage(code):cause.toString();
-        _reason=message;
+        {    
+            _reason=HttpStatus.getMessage(code);
+            message=cause==null?_reason:cause.toString();
+        }    
+        else
+            _reason=message;
 
         // If we are allowed to have a body, then produce the error page.
         if (code != SC_NO_CONTENT && code != SC_NOT_MODIFIED &&

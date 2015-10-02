@@ -106,7 +106,7 @@ public class AsyncServletTest
         
         ErrorPageErrorHandler errorHandler = new ErrorPageErrorHandler();
         context.setErrorHandler(errorHandler);
-        errorHandler.addErrorPage(300,599,"/error");
+        errorHandler.addErrorPage(300,599,"/error/custom");
         
 
         _servletHandler=context.getServletHandler();
@@ -181,11 +181,11 @@ public class AsyncServletTest
             "initial",
             "start",
             "onTimeout",
-            "ERROR /ctx/path/info",
+            "ERROR /ctx/error/custom",
             "!initial",
             "onComplete"));
 
-        assertContains("ERROR DISPATCH: /ctx/path/info",response);
+        assertContains("ERROR DISPATCH: /ctx/error/custom",response);
     }
 
     @Test
@@ -219,7 +219,7 @@ public class AsyncServletTest
             "onTimeout",
             "error",
             "onError",
-            "ERROR /ctx/path/info",
+            "ERROR /ctx/error/custom",
             "!initial",
             "onComplete"));
 
@@ -322,10 +322,10 @@ public class AsyncServletTest
             "initial",
             "start",
             "onError",
-            "ERROR /ctx/path/info",
+            "ERROR /ctx/error/custom",
             "!initial",
             "onComplete"));
-        assertContains("ERROR DISPATCH: /ctx/path/info",response);
+        assertContains("ERROR DISPATCH: /ctx/error/custom",response);
     }
 
     @Test
@@ -416,10 +416,10 @@ public class AsyncServletTest
             "onStartAsync",
             "start",
             "onTimeout",
-            "ERROR /ctx/path/info",
+            "ERROR /ctx/error/custom",
             "!initial",
             "onComplete"));
-        assertContains("ERROR DISPATCH: /ctx/path/info",response);
+        assertContains("ERROR DISPATCH: /ctx/error/custom",response);
     }
 
     @Test
@@ -432,7 +432,7 @@ public class AsyncServletTest
             "initial",
             "start",
             "onTimeout",
-            "ERROR /ctx/path/info",
+            "ERROR /ctx/error/custom",
             "!initial",
             "onStartAsync",
             "start",
@@ -453,7 +453,7 @@ public class AsyncServletTest
             "initial",
             "start",
             "onTimeout",
-            "ERROR /ctx/path/info",
+            "ERROR /ctx/error/custom",
             "!initial",
             "onStartAsync",
             "start",
@@ -472,15 +472,15 @@ public class AsyncServletTest
             "initial",
             "start",
             "onTimeout",
-            "ERROR /ctx/path/info",
+            "ERROR /ctx/error/custom",
             "!initial",
             "onStartAsync",
             "start",
             "onTimeout",
-            "ERROR /ctx/path/info",
+            "ERROR /ctx/error/custom",
             "!initial",
             "onComplete"));
-        assertContains("ERROR DISPATCH: /ctx/path/info",response);
+        assertContains("ERROR DISPATCH: /ctx/error/custom",response);
     }
 
     @Test

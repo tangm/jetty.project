@@ -153,7 +153,7 @@ public class AsyncListenerTest
         // Add a custom error page.
         ErrorPageErrorHandler errorHandler = new ErrorPageErrorHandler();
         errorHandler.setServer(server);
-        errorHandler.addErrorPage(TestRuntimeException.class, "/error");
+        errorHandler.addErrorPage(HttpStatus.BAD_GATEWAY_502, "/error");
         server.addManaged(errorHandler);
 
         String httpResponse = connector.getResponses("" +

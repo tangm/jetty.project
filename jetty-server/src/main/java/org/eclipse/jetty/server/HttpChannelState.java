@@ -649,8 +649,10 @@ public class HttpChannelState
                     throw new IllegalStateException("Error already set",_event.getThrowable());
                 _event.addThrowable(failure);
                 _event.getSuppliedRequest().setAttribute(ERROR_STATUS_CODE,code);
-                _event.getSuppliedRequest().setAttribute(ERROR_EXCEPTION,_event.getThrowable());
-                _event.getSuppliedRequest().setAttribute(ERROR_MESSAGE,_event.getThrowable().getMessage());
+                _event.getSuppliedRequest().setAttribute(ERROR_EXCEPTION,failure);
+                _event.getSuppliedRequest().setAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE,failure==null?null:failure.getClass());
+                    
+                _event.getSuppliedRequest().setAttribute(ERROR_MESSAGE,reason!=null?reason:null);
             }
             else
             {
@@ -659,7 +661,8 @@ public class HttpChannelState
                     throw new IllegalStateException("Error already set",error);
                 baseRequest.setAttribute(ERROR_STATUS_CODE,code);
                 baseRequest.setAttribute(ERROR_EXCEPTION,failure);
-                baseRequest.setAttribute(ERROR_MESSAGE,reason!=null?reason:failure.getMessage());
+                baseRequest.setAttribute(RequestDispatcher.ERROR_EXCEPTION_TYPE,failure==null?null:failure.getClass());
+                baseRequest.setAttribute(ERROR_MESSAGE,reason!=null?reason:null);
             }
             
             // Are we blocking?

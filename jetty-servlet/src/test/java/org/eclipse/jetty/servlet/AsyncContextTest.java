@@ -21,6 +21,7 @@ package org.eclipse.jetty.servlet;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.AsyncEvent;
@@ -128,7 +129,7 @@ public class AsyncContextTest
                 "Host: localhost\r\n" +
                 "Connection: close\r\n" +
                 "\r\n";
-        String responseString = _connector.getResponses(request);
+        String responseString = _connector.getResponses(request,10,TimeUnit.MINUTES);
 
         assertThat(responseString, startsWith("HTTP/1.1 500 "));
         assertThat(responseString, containsString("ERROR: /error"));
@@ -168,9 +169,9 @@ public class AsyncContextTest
         br.readLine();// connection close
         br.readLine();// server
         br.readLine();// empty
-        Assert.assertEquals("error servlet", "ERROR: /error", br.readLine());
-        Assert.assertEquals("error servlet", "PathInfo= /IOE", br.readLine());
-        Assert.assertEquals("error servlet", "EXCEPTION: org.eclipse.jetty.server.QuietServletException: java.io.IOException: Test", br.readLine());
+        Assert.assertEquals("ERROR: /error", br.readLine());
+        Assert.assertEquals("PathInfo= /IOE", br.readLine());
+        Assert.assertEquals("EXCEPTION: org.eclipse.jetty.server.QuietServletException: java.io.IOException: Test", br.readLine());
     }
 
     @Test
@@ -377,7 +378,7 @@ public class AsyncContextTest
 
         BufferedReader br = new BufferedReader(new StringReader(responseString));
 
-        assertEquals("HTTP/1.1 500 Async Timeout", br.readLine());
+        assertEquals("HTTP/1.1 500 Server Error", br.readLine());
 
         br.readLine();// connection close
         br.readLine();// server
