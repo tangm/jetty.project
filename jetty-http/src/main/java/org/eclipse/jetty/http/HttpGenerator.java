@@ -41,7 +41,7 @@ public class HttpGenerator
 {
     private final static Logger LOG = Log.getLogger(HttpGenerator.class);
 
-    public final static boolean __STRICT=Boolean.getBoolean("org.eclipse.jetty.http.HttpGenerator.STRICT"); 
+    public final static boolean __STRICT=Boolean.getBoolean("org.eclipse.jetty.http.HttpGenerator.STRICT");
 
     private final static byte[] __colon_space = new byte[] {':',' '};
     private final static HttpHeaderValue[] CLOSE = {HttpHeaderValue.CLOSE};
@@ -87,7 +87,7 @@ public class HttpGenerator
     {
         this(false,false);
     }
-    
+
     /* ------------------------------------------------------------------------------- */
     public HttpGenerator(boolean sendServerVersion,boolean sendXPoweredBy)
     {
@@ -160,7 +160,7 @@ public class HttpGenerator
     {
         return _noContent;
     }
-    
+
     /* ------------------------------------------------------------ */
     public void setPersistent(boolean persistent)
     {
@@ -212,7 +212,11 @@ public class HttpGenerator
 
                 // If we have not been told our persistence, set the default
                 if (_persistent==null)
-                    _persistent=(info.getVersion().ordinal() > HttpVersion.HTTP_1_0.ordinal());
+                {
+                    _persistent=info.getVersion().ordinal() > HttpVersion.HTTP_1_0.ordinal();
+                    if (!_persistent && HttpMethod.CONNECT.is(info.getMethod()))
+                        _persistent=true;
+                }
 
                 // prepare the header
                 int pos=BufferUtil.flipToFill(header);
@@ -278,12 +282,9 @@ public class HttpGenerator
                 }
 
                 if (last)
-                {
                     _state=State.COMPLETING;
-                    return len>0?Result.FLUSH:Result.CONTINUE;
-                }
 
-                return Result.FLUSH;
+                return len>0?Result.FLUSH:Result.CONTINUE;
             }
 
             case COMPLETING:
@@ -330,7 +331,7 @@ public class HttpGenerator
     {
         return generateResponse(info,false,header,chunk,content,last);
     }
-    
+
     /* ------------------------------------------------------------ */
     public Result generateResponse(MetaData.Response info, boolean head, ByteBuffer header, ByteBuffer chunk, ByteBuffer content, boolean last) throws IOException
     {
@@ -597,7 +598,7 @@ public class HttpGenerator
                 String v = field.getValue();
                 if (v==null || v.length()==0)
                     continue; // rfc7230 does not allow no value
-                
+
                 HttpHeader h = field.getHeader();
 
                 switch (h==null?HttpHeader.UNKNOWN:h)
@@ -664,9 +665,9 @@ public class HttpGenerator
                                 case CLOSE:
                                 {
                                     close=true;
+                                    _persistent=false;
                                     if (response!=null)
                                     {
-                                        _persistent=false;
                                         if (_endOfContent == EndOfContent.UNKNOWN_CONTENT)
                                             _endOfContent=EndOfContent.EOF_CONTENT;
                                     }
@@ -890,8 +891,9 @@ public class HttpGenerator
     @Override
     public String toString()
     {
-        return String.format("%s{s=%s}",
+        return String.format("%s@%x{s=%s}",
                 getClass().getSimpleName(),
+                hashCode(),
                 _state);
     }
 
@@ -959,7 +961,7 @@ public class HttpGenerator
         for (int i=0;i<l;i++)
         {
             char c=s.charAt(i);
-            
+
             if (c<0 || c>0xff || c=='\r' || c=='\n'|| c==':')
                 buffer.put((byte)'?');
             else
@@ -973,7 +975,7 @@ public class HttpGenerator
         for (int i=0;i<l;i++)
         {
             char c=s.charAt(i);
-            
+
             if (c<0 || c>0xff || c=='\r' || c=='\n')
                 buffer.put((byte)' ');
             else
@@ -1006,7 +1008,7 @@ public class HttpGenerator
         }
     }
 
-    public static void putTo(HttpFields fields, ByteBuffer bufferInFillMode) 
+    public static void putTo(HttpFields fields, ByteBuffer bufferInFillMode)
     {
         for (HttpField field : fields)
         {

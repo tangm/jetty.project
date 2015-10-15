@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.security.PermissionCollection;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -59,6 +60,7 @@ import org.eclipse.jetty.servlet.ErrorPageErrorHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.eclipse.jetty.util.AttributesMap;
+import org.eclipse.jetty.util.IO;
 import org.eclipse.jetty.util.Loader;
 import org.eclipse.jetty.util.MultiException;
 import org.eclipse.jetty.util.URIUtil;
@@ -108,6 +110,8 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     // System classes are classes that cannot be replaced by
     // the web application, and they are *always* loaded via
     // system classloader.
+    // TODO This centrally managed list of features that are exposed/hidden needs to be replaced
+    // with a more automatic distributed mechanism
     public final static String[] __dftSystemClasses =
     {
         "java.",                            // Java SE classes (per servlet spec v2.5 / SRV.9.7.2)
@@ -130,6 +134,8 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
     // loaded by the web application using system classloader,
     // so if web application needs to load any of such classes,
     // it has to include them in its distribution.
+    // TODO This centrally managed list of features that are exposed/hidden needs to be replaced
+    // with a more automatic distributed mechanism
     public final static String[] __dftServerClasses =
     {
         "-org.eclipse.jetty.jmx.",          // don't hide jmx classes
@@ -144,6 +150,7 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         "-org.eclipse.jetty.websocket.",    // don't hide websocket classes from webapps (allow webapp to use ones from system classloader)
         "-org.eclipse.jetty.apache.",       // don't hide jetty apache impls
         "-org.eclipse.jetty.util.log.",     // don't hide server log 
+        "-org.eclipse.jetty.alpn.",         // don't hide ALPN
         "org.objectweb.asm.",               // hide asm used by jetty
         "org.eclipse.jdt.",                 // hide jdt used by jetty
         "org.eclipse.jetty."                // hide other jetty classes
@@ -1354,7 +1361,12 @@ public class WebAppContext extends ServletContextHandler implements WebAppClassL
         finally
         {
             if (_ownClassLoader)
+            {
+                ClassLoader loader = getClassLoader();
+                if (loader != null && loader instanceof URLClassLoader)
+                    ((URLClassLoader)loader).close(); 
                 setClassLoader(null);
+            }
 
             setAvailable(true);
             _unavailableException=null;
