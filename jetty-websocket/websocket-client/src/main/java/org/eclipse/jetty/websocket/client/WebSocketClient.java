@@ -29,25 +29,22 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 
+import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.io.MappedByteBufferPool;
-import org.eclipse.jetty.io.SelectorManager;
 import org.eclipse.jetty.util.DecoratedObjectFactory;
-import org.eclipse.jetty.util.HttpCookieStore;
 import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.eclipse.jetty.util.thread.ScheduledExecutorScheduler;
 import org.eclipse.jetty.util.thread.Scheduler;
 import org.eclipse.jetty.util.thread.ShutdownThread;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.WebSocketPolicy;
 import org.eclipse.jetty.websocket.api.extensions.ExtensionConfig;
 import org.eclipse.jetty.websocket.api.extensions.ExtensionFactory;
-import org.eclipse.jetty.websocket.client.io.ConnectPromise;
+import org.eclipse.jetty.websocket.client.http.WebSocketUpgradeRequest;
 import org.eclipse.jetty.websocket.client.io.ConnectionManager;
 import org.eclipse.jetty.websocket.client.io.UpgradeListener;
 import org.eclipse.jetty.websocket.client.masks.Masker;
@@ -67,29 +64,48 @@ import org.eclipse.jetty.websocket.common.scopes.WebSocketContainerScope;
 public class WebSocketClient extends ContainerLifeCycle implements SessionListener, WebSocketContainerScope
 {
     private static final Logger LOG = Log.getLogger(WebSocketClient.class);
+    
+    // From HttpClient
+    private HttpClient httpClient;
+    
+//    private final SslContextFactory sslContextFactory;
+//    private ByteBufferPool bufferPool;
+//    private Executor executor;
+//    private Scheduler scheduler;
+//    private SocketAddress bindAddress;
+//    private long connectTimeout = SelectorManager.DEFAULT_CONNECT_TIMEOUT;
+//    private boolean dispatchIO = true; // REMOVE
 
+    // Other
     private final WebSocketPolicy policy = WebSocketPolicy.newClientPolicy();
-    private final SslContextFactory sslContextFactory;
     private final WebSocketExtensionFactory extensionRegistry;
-    private boolean daemon = false;
-    private EventDriverFactory eventDriverFactory;
-    private SessionFactory sessionFactory;
-    private ByteBufferPool bufferPool;
-    private Executor executor;
-    private DecoratedObjectFactory objectFactory;
-    private Scheduler scheduler;
-    private CookieStore cookieStore;
-    private ConnectionManager connectionManager;
+    private final EventDriverFactory eventDriverFactory;
+    private final SessionFactory sessionFactory;
+    private final DecoratedObjectFactory objectFactory;
     private Masker masker;
-    private SocketAddress bindAddress;
-    private long connectTimeout = SelectorManager.DEFAULT_CONNECT_TIMEOUT;
-    private boolean dispatchIO = true;
 
     public WebSocketClient()
     {
-        this((SslContextFactory)null,null);
+        this(new HttpClient());
     }
     
+    public WebSocketClient(HttpClient httpClient)
+    {
+        this(httpClient, new DecoratedObjectFactory());
+    }
+    
+    public WebSocketClient(HttpClient httpClient, DecoratedObjectFactory objectFactory)
+    {
+        this.httpClient = httpClient;
+
+        this.objectFactory = objectFactory;
+        this.extensionRegistry = new WebSocketExtensionFactory(this);
+        this.masker = new RandomMasker();
+        this.eventDriverFactory = new EventDriverFactory(policy);
+        this.sessionFactory = new WebSocketSessionFactory(this);
+    }
+    
+    // below are old
     public WebSocketClient(Executor executor)
     {
         this(null,executor);
@@ -127,35 +143,57 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
 
     public WebSocketClient(SslContextFactory sslContextFactory, Executor executor, ByteBufferPool bufferPool, DecoratedObjectFactory objectFactory)
     {
-        this.executor = executor;
-        this.sslContextFactory = sslContextFactory;
-        this.bufferPool = bufferPool;
+        this.httpClient = new HttpClient(sslContextFactory);
+        this.httpClient.setExecutor(executor);
+        
         this.objectFactory = objectFactory;
         this.extensionRegistry = new WebSocketExtensionFactory(this);
         
         this.masker = new RandomMasker();
         this.eventDriverFactory = new EventDriverFactory(policy);
-        
-        addBean(this.executor);
-        addBean(this.sslContextFactory);
-        addBean(this.bufferPool);
+        this.sessionFactory = new WebSocketSessionFactory(this);
     }
     
+    public WebSocketClient(WebSocketContainerScope scope, EventDriverFactory eventDriverFactory, SessionFactory sessionFactory)
+    {
+        this.httpClient = new HttpClient(scope.getSslContextFactory());
+        this.httpClient.setExecutor(scope.getExecutor());
+
+        this.objectFactory = new DecoratedObjectFactory();
+        this.extensionRegistry = new WebSocketExtensionFactory(this);
+
+        this.masker = new RandomMasker();
+        this.eventDriverFactory = eventDriverFactory;
+        this.sessionFactory = sessionFactory;
+    }
+
     public Future<Session> connect(Object websocket, URI toUri) throws IOException
     {
         ClientUpgradeRequest request = new ClientUpgradeRequest(toUri);
         request.setRequestURI(toUri);
-        request.setCookiesFrom(this.cookieStore);
+        request.setLocalEndpoint(websocket);
 
         return connect(websocket,toUri,request);
     }
 
-    public Future<Session> connect(Object websocket, URI toUri, ClientUpgradeRequest request) throws IOException
+    /**
+     * Connect to remote websocket endpoint
+     * 
+     * @param websocket the websocket object
+     * @param toUri the websocket uri to connect to
+     * @param request the upgrade request information
+     * @param upgradeListener does nothing
+     * @return the future for the session, available on success of connect
+     * @throws IOException if unable to connect
+     * @deprecated {@link UpgradeListener} no longer supported, no alternative available
+     */
+    @Deprecated
+    public Future<Session> connect(Object websocket, URI toUri, ClientUpgradeRequest request, UpgradeListener upgradeListener) throws IOException
     {
         return connect(websocket,toUri,request,null);
     }
 
-    public Future<Session> connect(Object websocket, URI toUri, ClientUpgradeRequest request, UpgradeListener upgradeListener) throws IOException
+    public Future<Session> connect(Object websocket, URI toUri, ClientUpgradeRequest request) throws IOException
     {
         if (!isStarted())
         {
@@ -180,7 +218,7 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
         }
 
         request.setRequestURI(toUri);
-        request.setCookiesFrom(this.cookieStore);
+        request.setLocalEndpoint(websocket);
 
         // Validate Requested Extensions
         for (ExtensionConfig reqExt : request.getExtensions())
@@ -194,107 +232,27 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
         if (LOG.isDebugEnabled())
             LOG.debug("connect websocket {} to {}",websocket,toUri);
 
-        // Grab Connection Manager
-        initializeClient();
-        ConnectionManager manager = getConnectionManager();
-
-        // Setup Driver for user provided websocket
-        EventDriver driver = null;
-        if (websocket instanceof EventDriver)
-        {
-            // Use the EventDriver as-is
-            driver = (EventDriver)websocket;
-        }
-        else
-        {
-            // Wrap websocket with appropriate EventDriver
-            driver = eventDriverFactory.wrap(websocket);
-        }
-
-        if (driver == null)
-        {
-            throw new IllegalStateException("Unable to identify as websocket object: " + websocket.getClass().getName());
-        }
-
-        // Create the appropriate (physical vs virtual) connection task
-        ConnectPromise promise = manager.connect(this,driver,request);
-
-        if (upgradeListener != null)
-        {
-            promise.setUpgradeListener(upgradeListener);
-        }
-
-        if (LOG.isDebugEnabled())
-            LOG.debug("Connect Promise: {}",promise);
-
-        // Execute the connection on the executor thread
-        executor.execute(promise);
-
-        // Return the future
-        return promise;
+        init();
+        
+        WebSocketUpgradeRequest wsReq = new WebSocketUpgradeRequest(this,httpClient,request);
+        return wsReq.sendAsync();
     }
-
+    
     @Override
     protected void doStart() throws Exception
     {
-        if (LOG.isDebugEnabled())
-            LOG.debug("Starting {}",this);
-
-        if (sslContextFactory != null)
-        {
-            addBean(sslContextFactory);
-        }
-
-        String name = WebSocketClient.class.getSimpleName() + "@" + hashCode();
-
-        if (bufferPool == null)
-        {
-            bufferPool = new MappedByteBufferPool();
-        }
-        addBean(bufferPool);
-
-        if (scheduler == null)
-        {
-            scheduler = new ScheduledExecutorScheduler(name + "-scheduler",daemon);
-        }
-        addBean(scheduler);
-
-        if (cookieStore == null)
-        {
-            cookieStore = new HttpCookieStore.Empty();
-        }
-
-        if(this.sessionFactory == null)
-        {
-            this.sessionFactory = new WebSocketSessionFactory(this);
-        }
-        
-        if(this.objectFactory == null)
-        {
-            this.objectFactory = new DecoratedObjectFactory();
-        }
+        if(!httpClient.isStarted())
+            addBean(httpClient);
 
         super.doStart();
-        
-        if (LOG.isDebugEnabled())
-            LOG.debug("Started {}",this);
     }
 
     @Override
     protected void doStop() throws Exception
     {
-        if (LOG.isDebugEnabled())
-            LOG.debug("Stopping {}",this);
-        
         if (ShutdownThread.isRegistered(this))
         {
             ShutdownThread.deregister(this);
-        }
-
-        if (cookieStore != null)
-        {
-            cookieStore.removeAll();
-            cookieStore = null;
         }
 
         super.doStop();
@@ -303,9 +261,10 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
             LOG.debug("Stopped {}",this);
     }
 
+    @Deprecated
     public boolean isDispatchIO()
     {
-        return dispatchIO;
+        return httpClient.isDispatchIO();
     }
 
     /**
@@ -320,27 +279,28 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
 
     public SocketAddress getBindAddress()
     {
-        return bindAddress;
+        return httpClient.getBindAddress();
     }
 
     public ByteBufferPool getBufferPool()
     {
-        return bufferPool;
+        return httpClient.getByteBufferPool();
     }
 
+    @Deprecated
     public ConnectionManager getConnectionManager()
     {
-        return connectionManager;
+        throw new UnsupportedOperationException("ConnectionManager is no longer supported");
     }
 
     public long getConnectTimeout()
     {
-        return connectTimeout;
+        return httpClient.getConnectTimeout();
     }
 
     public CookieStore getCookieStore()
     {
-        return cookieStore;
+        return httpClient.getCookieStore();
     }
     
     public EventDriverFactory getEventDriverFactory()
@@ -350,7 +310,7 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
 
     public Executor getExecutor()
     {
-        return executor;
+        return httpClient.getExecutor();
     }
 
     public ExtensionFactory getExtensionFactory()
@@ -431,7 +391,7 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
 
     public Scheduler getScheduler()
     {
-        return scheduler;
+        return httpClient.getScheduler();
     }
     
     public SessionFactory getSessionFactory()
@@ -445,45 +405,42 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
      */
     public SslContextFactory getSslContextFactory()
     {
-        return sslContextFactory;
+        return httpClient.getSslContextFactory();
     }
 
-    private synchronized void initializeClient() throws IOException
+    private synchronized void init() throws IOException
     {
         if (!ShutdownThread.isRegistered(this))
         {
             ShutdownThread.register(this);
         }
 
-        if (executor == null)
-        {
-            QueuedThreadPool threadPool = new QueuedThreadPool();
-            String name = WebSocketClient.class.getSimpleName() + "@" + hashCode();
-            threadPool.setName(name);
-            threadPool.setDaemon(daemon);
-            executor = threadPool;
-            addManaged(threadPool);
-        }
-        else
-        {
-            addBean(executor,false);
-        }
-
-        if (connectionManager == null)
-        {
-            connectionManager = newConnectionManager();
-            addManaged(connectionManager);
-        }
+        // TODO: reevaluate
+//        if (executor == null)
+//        {
+//            QueuedThreadPool threadPool = new QueuedThreadPool();
+//            String name = WebSocketClient.class.getSimpleName() + "@" + hashCode();
+//            threadPool.setName(name);
+//            threadPool.setDaemon(daemon);
+//            executor = threadPool;
+//            addManaged(threadPool);
+//        }
+//        else
+//        {
+//            addBean(executor,false);
+//        }
     }
 
     /**
      * Factory method for new ConnectionManager (used by other projects like cometd)
      * 
      * @return the ConnectionManager instance to use
+     * @deprecated use HttpClient instead
      */
+    @Deprecated
     protected ConnectionManager newConnectionManager()
     {
-        return new ConnectionManager(this);
+        throw new UnsupportedOperationException("ConnectionManager is no longer supported");
     }
 
     @Override
@@ -519,12 +476,12 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
 
     public void setBindAddress(SocketAddress bindAddress)
     {
-        this.bindAddress = bindAddress;
+        this.httpClient.setBindAddress(bindAddress);
     }
 
     public void setBufferPool(ByteBufferPool bufferPool)
     {
-        this.bufferPool = bufferPool;
+        this.httpClient.setByteBufferPool(bufferPool);
     }
 
     /**
@@ -535,37 +492,28 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
      */
     public void setConnectTimeout(long ms)
     {
-        if (ms < 0)
-        {
-            throw new IllegalStateException("Connect Timeout cannot be negative");
-        }
-        this.connectTimeout = ms;
+        this.httpClient.setConnectTimeout(ms);
     }
 
     public void setCookieStore(CookieStore cookieStore)
     {
-        this.cookieStore = cookieStore;
+        this.httpClient.setCookieStore(cookieStore);
     }
     
     public void setDaemon(boolean daemon)
     {
-        this.daemon = daemon;
+        // do nothing
     }
 
+    @Deprecated
     public void setDispatchIO(boolean dispatchIO)
     {
-        this.dispatchIO = dispatchIO;
-    }
-
-    public void setEventDriverFactory(EventDriverFactory factory)
-    {
-        this.eventDriverFactory = factory;
+        this.httpClient.setDispatchIO(dispatchIO);
     }
 
     public void setExecutor(Executor executor)
     {
-        updateBean(this.executor,executor);
-        this.executor = executor;
+        this.httpClient.setExecutor(executor);
     }
 
     public void setMasker(Masker masker)
@@ -594,11 +542,6 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
     public void setMaxTextMessageBufferSize(int max)
     {
         this.policy.setMaxTextMessageBufferSize(max);
-    }
-
-    public void setSessionFactory(SessionFactory sessionFactory)
-    {
-        this.sessionFactory = sessionFactory;
     }
 
     @Override

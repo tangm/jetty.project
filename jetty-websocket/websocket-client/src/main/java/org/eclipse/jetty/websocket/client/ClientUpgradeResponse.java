@@ -19,42 +19,48 @@
 package org.eclipse.jetty.websocket.client;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.List;
 
-import org.eclipse.jetty.util.BufferUtil;
-import org.eclipse.jetty.util.log.Log;
-import org.eclipse.jetty.util.log.Logger;
+import org.eclipse.jetty.client.HttpResponse;
+import org.eclipse.jetty.http.HttpField;
+import org.eclipse.jetty.http.HttpFields;
 import org.eclipse.jetty.websocket.api.UpgradeResponse;
-import org.eclipse.jetty.websocket.common.io.http.HttpResponseHeaderParseListener;
+import org.eclipse.jetty.websocket.api.extensions.ExtensionConfig;
 
-public class ClientUpgradeResponse extends UpgradeResponse implements HttpResponseHeaderParseListener
+public class ClientUpgradeResponse extends UpgradeResponse
 {
-    private static final Logger LOG = Log.getLogger(ClientUpgradeResponse.class);
-    private ByteBuffer remainingBuffer;
+    private List<ExtensionConfig> extensions;
 
     public ClientUpgradeResponse()
     {
         super();
     }
-
-    public ByteBuffer getRemainingBuffer()
+    
+    public ClientUpgradeResponse(HttpResponse response)
     {
-        return remainingBuffer;
+        super();
+        setStatusCode(response.getStatus());
+        setStatusReason(response.getReason());
+
+        HttpFields fields = response.getHeaders();
+        for (HttpField field : fields)
+        {
+            addHeader(field.getName(),field.getValue());
+        }
+
+        this.extensions = ExtensionConfig.parseEnum(fields.getValues("Sec-WebSocket-Extensions"));
+        setAcceptedSubProtocol(fields.get("Sec-WebSocket-Protocol"));
+    }
+    
+    @Override
+    public List<ExtensionConfig> getExtensions()
+    {
+        return this.extensions;
     }
 
     @Override
     public void sendForbidden(String message) throws IOException
     {
         throw new UnsupportedOperationException("Not supported on client implementation");
-    }
-
-    @Override
-    public void setRemainingBuffer(ByteBuffer remainingBuffer)
-    {
-        if (LOG.isDebugEnabled())
-        {
-            LOG.debug("Saving remaining header: {}",BufferUtil.toDetailString(remainingBuffer));
-        }
-        this.remainingBuffer = remainingBuffer;
     }
 }

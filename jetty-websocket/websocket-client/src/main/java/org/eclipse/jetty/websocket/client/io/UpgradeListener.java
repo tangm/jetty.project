@@ -23,7 +23,9 @@ import org.eclipse.jetty.websocket.api.UpgradeResponse;
 
 /**
  * Listener for Handshake/Upgrade events.
+ * @deprecated no longer supported, no alternative available
  */
+@Deprecated
 public interface UpgradeListener
 {
     public void onHandshakeRequest(UpgradeRequest request);

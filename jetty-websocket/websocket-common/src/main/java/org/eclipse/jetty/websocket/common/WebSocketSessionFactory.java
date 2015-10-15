@@ -62,6 +62,6 @@ public class WebSocketSessionFactory implements SessionFactory
     @Override
     public WebSocketSession createSession(URI requestURI, EventDriver websocket, LogicalConnection connection)
     {
-        return new WebSocketSession(containerScope, requestURI,websocket,connection,listeners);
+        return new WebSocketSession(containerScope,requestURI,websocket,connection,listeners);
     }
 }

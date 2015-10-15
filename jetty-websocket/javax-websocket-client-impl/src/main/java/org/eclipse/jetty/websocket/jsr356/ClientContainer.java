@@ -103,10 +103,9 @@ public class ClientContainer extends ContainerLifeCycle implements WebSocketCont
         boolean trustAll = Boolean.getBoolean("org.eclipse.jetty.websocket.jsr356.ssl-trust-all");
         
         this.scopeDelegate = scope;
-        client = new WebSocketClient(scope, new SslContextFactory(trustAll));
-        client.setEventDriverFactory(new JsrEventDriverFactory(client.getPolicy()));
-        SessionFactory sessionFactory = new JsrSessionFactory(this,this,client);
-        client.setSessionFactory(sessionFactory);
+        client = new WebSocketClient(scope, 
+                new JsrEventDriverFactory(client.getPolicy()),
+                new JsrSessionFactory(this,this,client));
         addBean(client);
 
         this.endpointClientMetadataCache = new ConcurrentHashMap<>();

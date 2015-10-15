@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 import org.eclipse.jetty.io.ByteBufferPool;
@@ -69,6 +70,7 @@ public class WebSocketSession extends ContainerLifeCycle implements Session, Web
     private final EventDriver websocket;
     private final SessionListener[] sessionListeners;
     private final Executor executor;
+    private final WebSocketPolicy policy;
     private ClassLoader classLoader;
     private ExtensionFactory extensionFactory;
     private String protocolVersion;
@@ -76,9 +78,9 @@ public class WebSocketSession extends ContainerLifeCycle implements Session, Web
     private WebSocketRemoteEndpoint remote;
     private IncomingFrames incomingHandler;
     private OutgoingFrames outgoingHandler;
-    private WebSocketPolicy policy;
     private UpgradeRequest upgradeRequest;
     private UpgradeResponse upgradeResponse;
+    private CompletableFuture<Session> openFuture;
 
     public WebSocketSession(WebSocketContainerScope containerScope, URI requestURI, EventDriver websocket, LogicalConnection connection, SessionListener... sessionListeners)
     {
@@ -87,6 +89,7 @@ public class WebSocketSession extends ContainerLifeCycle implements Session, Web
 
         this.classLoader = Thread.currentThread().getContextClassLoader();
         this.containerScope = containerScope;
+        this.policy = containerScope.getPolicy();
         this.requestURI = requestURI;
         this.websocket = websocket;
         this.connection = connection;
@@ -465,6 +468,10 @@ public class WebSocketSession extends ContainerLifeCycle implements Session, Web
                         LOG.ignore(t);
                     }
                 }
+                if(openFuture != null)
+                {
+                    openFuture.complete(this);
+                }
                 break;
         }
     }
@@ -528,6 +535,11 @@ public class WebSocketSession extends ContainerLifeCycle implements Session, Web
         this.extensionFactory = extensionFactory;
     }
 
+    public void setFuture(CompletableFuture<Session> fut)
+    {
+        this.openFuture = fut;
+    }
+
     /**
      * Set the timeout in milliseconds
      */
@@ -542,9 +554,9 @@ public class WebSocketSession extends ContainerLifeCycle implements Session, Web
         this.outgoingHandler = outgoing;
     }
 
+    @Deprecated
     public void setPolicy(WebSocketPolicy policy)
     {
-        this.policy = policy;
     }
 
     public void setUpgradeRequest(UpgradeRequest request)

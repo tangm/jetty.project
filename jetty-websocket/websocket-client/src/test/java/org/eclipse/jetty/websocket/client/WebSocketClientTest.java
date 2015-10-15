@@ -140,12 +140,11 @@ public class WebSocketClientTest
     public void testBasicEcho_UsingCallback() throws Exception
     {
         WebSocketClient client = new WebSocketClient();
+        client.setMaxIdleTimeout(160000);
         client.start();
         try
         {
             JettyTrackingSocket cliSock = new JettyTrackingSocket();
-
-            client.getPolicy().setIdleTimeout(10000);
 
             URI wsUri = server.getWsUri();
             ClientUpgradeRequest request = new ClientUpgradeRequest();
