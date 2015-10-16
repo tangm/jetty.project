@@ -78,6 +78,7 @@ public class AsyncServletTest
 
     protected Server _server = new Server();
     protected ServletHandler _servletHandler;
+    protected ErrorPageErrorHandler _errorHandler;
     protected ServerConnector _connector;
     protected List<String> _log;
     protected int _expectedLogs;
@@ -85,6 +86,12 @@ public class AsyncServletTest
     protected static List<String> __history=new CopyOnWriteArrayList<>();
     protected static CountDownLatch __latch;
 
+    static void historyAdd(String item)
+    {
+        // System.err.println(Thread.currentThread()+" history: "+item);
+        __history.add(item);
+    }
+    
     @Before
     public void setUp() throws Exception
     {
@@ -104,9 +111,9 @@ public class AsyncServletTest
         logHandler.setHandler(context);
         context.addEventListener(new DebugListener());
         
-        ErrorPageErrorHandler errorHandler = new ErrorPageErrorHandler();
-        context.setErrorHandler(errorHandler);
-        errorHandler.addErrorPage(300,599,"/error/custom");
+        _errorHandler = new ErrorPageErrorHandler();
+        context.setErrorHandler(_errorHandler);
+        _errorHandler.addErrorPage(300,599,"/error/custom");
         
 
         _servletHandler=context.getServletHandler();
@@ -466,21 +473,23 @@ public class AsyncServletTest
     public void testStartTimeoutStart() throws Exception
     {
         _expectedCode="500 ";
+        _errorHandler.addErrorPage(500,"/path/error");
+        
         String response=process("start=10&start2=10",null);
         assertThat(__history,contains(
             "REQUEST /ctx/path/info",
             "initial",
             "start",
             "onTimeout",
-            "ERROR /ctx/error/custom",
+            "ERROR /ctx/path/error",
             "!initial",
             "onStartAsync",
             "start",
             "onTimeout",
-            "ERROR /ctx/error/custom",
+            "ERROR /ctx/path/error",
             "!initial",
             "onComplete"));
-        assertContains("ERROR DISPATCH: /ctx/error/custom",response);
+        assertContains("ERROR DISPATCH: /ctx/path/error",response);
     }
 
     @Test
@@ -679,9 +688,9 @@ public class AsyncServletTest
         @Override
         public void doGet(final HttpServletRequest request, final HttpServletResponse response) throws ServletException, IOException
         {
-            __history.add("FWD "+request.getDispatcherType()+" "+request.getRequestURI());
+            historyAdd("FWD "+request.getDispatcherType()+" "+request.getRequestURI());
             if (request instanceof ServletRequestWrapper || response instanceof ServletResponseWrapper)
-                __history.add("wrapped"+((request instanceof ServletRequestWrapper)?" REQ":"")+((response instanceof ServletResponseWrapper)?" RSP":""));
+                historyAdd("wrapped"+((request instanceof ServletRequestWrapper)?" REQ":"")+((response instanceof ServletResponseWrapper)?" RSP":""));
             request.getServletContext().getRequestDispatcher("/path1").forward(request,response);
         }
     }
@@ -706,9 +715,9 @@ public class AsyncServletTest
             }
 
             // System.err.println(request.getDispatcherType()+" "+request.getRequestURI());
-            __history.add(request.getDispatcherType()+" "+request.getRequestURI());
+            historyAdd(request.getDispatcherType()+" "+request.getRequestURI());
             if (request instanceof ServletRequestWrapper || response instanceof ServletResponseWrapper)
-                __history.add("wrapped"+((request instanceof ServletRequestWrapper)?" REQ":"")+((response instanceof ServletResponseWrapper)?" RSP":""));
+                historyAdd("wrapped"+((request instanceof ServletRequestWrapper)?" REQ":"")+((response instanceof ServletResponseWrapper)?" RSP":""));
 
             boolean wrap="true".equals(request.getParameter("wrap"));
             int read_before=0;
@@ -742,7 +751,7 @@ public class AsyncServletTest
             if (request.getAttribute("State")==null)
             {
                 request.setAttribute("State",new Integer(1));
-                __history.add("initial");
+                historyAdd("initial");
                 if (read_before>0)
                 {
                     byte[] buf=new byte[read_before];
@@ -770,7 +779,7 @@ public class AsyncServletTest
                                 while(b!=-1)
                                     if((b=in.read())>=0)
                                         c++;
-                                __history.add("async-read="+c);
+                                historyAdd("async-read="+c);
                             }
                             catch(Exception e)
                             {
@@ -786,7 +795,7 @@ public class AsyncServletTest
                     if (start_for>0)
                         async.setTimeout(start_for);
                     async.addListener(__listener);
-                    __history.add("start");
+                    historyAdd("start");
 
                     if ("1".equals(request.getParameter("throw")))
                         throw new QuietServletException(new Exception("test throw in async 1"));
@@ -802,7 +811,7 @@ public class AsyncServletTest
                                 {
                                     response.setStatus(200);
                                     response.getOutputStream().println("COMPLETED\n");
-                                    __history.add("complete");
+                                    historyAdd("complete");
                                     async.complete();
                                 }
                                 catch(Exception e)
@@ -820,7 +829,7 @@ public class AsyncServletTest
                     {
                         response.setStatus(200);
                         response.getOutputStream().println("COMPLETED\n");
-                        __history.add("complete");
+                        historyAdd("complete");
                         async.complete();
                     }
                     else if (dispatch_after>0)
@@ -830,7 +839,7 @@ public class AsyncServletTest
                             @Override
                             public void run()
                             {
-                                __history.add("dispatch");
+                                historyAdd("dispatch");
                                 if (path!=null)
                                 {
                                     int q=path.indexOf('?');
@@ -850,7 +859,7 @@ public class AsyncServletTest
                     }
                     else if (dispatch_after==0)
                     {
-                        __history.add("dispatch");
+                        historyAdd("dispatch");
                         if (path!=null)
                             async.dispatch(path);
                         else
@@ -879,7 +888,7 @@ public class AsyncServletTest
             }
             else
             {
-                __history.add("!initial");
+                historyAdd("!initial");
 
                 if (start2_for>=0 && request.getAttribute("2nd")==null)
                 {
@@ -891,7 +900,7 @@ public class AsyncServletTest
                     {
                         async.setTimeout(start2_for);
                     }
-                    __history.add("start");
+                    historyAdd("start");
 
                     if ("2".equals(request.getParameter("throw")))
                         throw new QuietServletException(new Exception("test throw in async 2"));
@@ -907,7 +916,7 @@ public class AsyncServletTest
                                 {
                                     response.setStatus(200);
                                     response.getOutputStream().println("COMPLETED\n");
-                                    __history.add("complete");
+                                    historyAdd("complete");
                                     async.complete();
                                 }
                                 catch(Exception e)
@@ -925,7 +934,7 @@ public class AsyncServletTest
                     {
                         response.setStatus(200);
                         response.getOutputStream().println("COMPLETED\n");
-                        __history.add("complete");
+                        historyAdd("complete");
                         async.complete();
                     }
                     else if (dispatch2_after>0)
@@ -935,7 +944,7 @@ public class AsyncServletTest
                             @Override
                             public void run()
                             {
-                                __history.add("dispatch");
+                                historyAdd("dispatch");
                                 async.dispatch();
                             }
                         };
@@ -946,7 +955,7 @@ public class AsyncServletTest
                     }
                     else if (dispatch2_after==0)
                     {
-                        __history.add("dispatch");
+                        historyAdd("dispatch");
                         async.dispatch();
                     }
                 }
@@ -969,11 +978,11 @@ public class AsyncServletTest
         @Override
         public void onTimeout(AsyncEvent event) throws IOException
         {
-            __history.add("onTimeout");
+            historyAdd("onTimeout");
             String action=event.getSuppliedRequest().getParameter("timeout");
             if (action!=null)
             {
-                __history.add(action);
+                historyAdd(action);
 
                 switch(action)
                 {
@@ -995,17 +1004,17 @@ public class AsyncServletTest
         @Override
         public void onStartAsync(AsyncEvent event) throws IOException
         {
-            __history.add("onStartAsync");
+            historyAdd("onStartAsync");
         }
 
         @Override
         public void onError(AsyncEvent event) throws IOException
         {
-            __history.add("onError");
+            historyAdd("onError");
             String action=event.getSuppliedRequest().getParameter("error");
             if (action!=null)
             {
-                __history.add(action);
+                historyAdd(action);
 
                 switch(action)
                 {
@@ -1024,7 +1033,7 @@ public class AsyncServletTest
         @Override
         public void onComplete(AsyncEvent event) throws IOException
         {
-            __history.add("onComplete");
+            historyAdd("onComplete");
             __latch.countDown();
         }
     };

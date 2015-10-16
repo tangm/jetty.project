@@ -165,11 +165,17 @@ public class HttpChannelState
     {
         try(Locker.Lock lock= _locker.lock())
         {
-            return String.format("%s@%x{s=%s a=%s i=%b r=%s w=%b}",getClass().getSimpleName(),hashCode(),_state,_async,_initial,
-                    _asyncReadPossible?(_asyncReadUnready?"PU":"P!U"):(_asyncReadUnready?"!PU":"!P!U"),
-                    _asyncWrite);
+            return toStringLocked();
         }
     }
+
+    public String toStringLocked()
+    {
+        return String.format("%s@%x{s=%s a=%s i=%b r=%s w=%b}",getClass().getSimpleName(),hashCode(),_state,_async,_initial,
+                _asyncReadPossible?(_asyncReadUnready?"PU":"P!U"):(_asyncReadUnready?"!PU":"!P!U"),
+                _asyncWrite);
+    }
+    
 
     private String getStatusStringLocked()
     {
@@ -189,10 +195,11 @@ public class HttpChannelState
      */
     protected Action handling()
     {
-        if(DEBUG)
-            LOG.debug("{} handling {}",this,_state);
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("handling {}",toStringLocked());
+            
             switch(_state)
             {
                 case IDLE:
@@ -267,6 +274,9 @@ public class HttpChannelState
 
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("startAsync {}",toStringLocked());
+            
             if (_state!=State.DISPATCHED || _async!=null)
                 throw new IllegalStateException(this.getStatusStringLocked());
 
@@ -321,11 +331,11 @@ public class HttpChannelState
         AsyncContextEvent schedule_event=null;
         boolean read_interested=false;
 
-        if(DEBUG)
-            LOG.debug("{} unhandle {}",this,_state);
-
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("unhandle {}",toStringLocked());
+            
             switch(_state)
             {
                 case COMPLETING:
@@ -427,6 +437,9 @@ public class HttpChannelState
         AsyncContextEvent event;
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("dispatch {} -> {}",toStringLocked(),path);
+            
             boolean started=false;
             event=_event;
             switch(_async)
@@ -478,6 +491,9 @@ public class HttpChannelState
         AsyncContextEvent event;
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("onTimeout {}",toStringLocked());
+            
             if (_async!=Async.STARTED)
                 return;
             _async=Async.EXPIRING;
@@ -485,9 +501,6 @@ public class HttpChannelState
             listeners=_asyncListeners;
 
         }
-
-        if (LOG.isDebugEnabled())
-            LOG.debug("Async timeout {}",this);
 
         final AtomicReference<Throwable> error=new AtomicReference<Throwable>();
         if (listeners!=null)
@@ -570,11 +583,15 @@ public class HttpChannelState
 
     public void complete()
     {
+
         // just like resume, except don't set _dispatched=true;
         boolean handle=false;
         AsyncContextEvent event;
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("complete {}",toStringLocked());
+            
             boolean started=false;
             event=_event;
             
@@ -610,6 +627,9 @@ public class HttpChannelState
     {
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("error complete {}",toStringLocked());
+            
             _async=Async.COMPLETE;
             _event.setDispatchContext(null);
             _event.setDispatchPath(null);
@@ -642,6 +662,9 @@ public class HttpChannelState
         
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("onError {} {}",toStringLocked(),failure);
+            
             // Set error on request.
             if(_event!=null)
             {
@@ -758,6 +781,9 @@ public class HttpChannelState
 
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("onComplete {}",toStringLocked());
+            
             switch(_state)
             {
                 case COMPLETING:
@@ -811,6 +837,9 @@ public class HttpChannelState
         cancelTimeout();
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("recycle {}",toStringLocked());
+            
             switch(_state)
             {
                 case DISPATCHED:
@@ -837,6 +866,9 @@ public class HttpChannelState
         cancelTimeout();
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("upgrade {}",toStringLocked());
+            
             switch(_state)
             {
                 case IDLE:
@@ -1035,6 +1067,9 @@ public class HttpChannelState
         boolean interested=false;
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("onReadUnready {}",toStringLocked());
+            
             // We were already unready, this is not a state change, so do nothing
             if (!_asyncReadUnready)
             {
@@ -1061,6 +1096,9 @@ public class HttpChannelState
         boolean woken=false;
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("onReadPossible {}",toStringLocked());
+            
             _asyncReadPossible=true;
             if (_state==State.ASYNC_WAIT && _asyncReadUnready)
             {
@@ -1083,6 +1121,9 @@ public class HttpChannelState
         boolean woken=false;
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("onReadReady {}",toStringLocked());
+            
             _asyncReadUnready=true;
             _asyncReadPossible=true;
             if (_state==State.ASYNC_WAIT)
@@ -1108,6 +1149,9 @@ public class HttpChannelState
 
         try(Locker.Lock lock= _locker.lock())
         {
+            if(DEBUG)
+                LOG.debug("onWritePossible {}",toStringLocked());
+            
             _asyncWrite=true;
             if (_state==State.ASYNC_WAIT)
             {

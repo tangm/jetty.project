@@ -384,8 +384,11 @@ public class HttpChannel implements Runnable, HttpOutput.Interceptor
                 }
             }
             catch (Throwable failure)
-            {
-                handleException(failure);
+            {               
+                if ("org.eclipse.jetty.continuation.ContinuationThrowable".equals(failure.getClass().getName()))
+                    LOG.ignore(failure);
+                else
+                    handleException(failure);
             }
             finally
             {

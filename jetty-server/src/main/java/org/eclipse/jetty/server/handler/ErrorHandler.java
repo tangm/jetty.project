@@ -36,6 +36,7 @@ import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.http.MimeTypes;
 import org.eclipse.jetty.server.AsyncContextEvent;
 import org.eclipse.jetty.server.Dispatcher;
+import org.eclipse.jetty.server.HttpOutput;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.server.Server;
@@ -56,7 +57,6 @@ import org.eclipse.jetty.util.log.Logger;
  */
 public class ErrorHandler extends AbstractHandler
 {
-    public static final String ERROR_PAGE = "org.eclipse.jetty.server.error_page";
     private static final Logger LOG = Log.getLogger(ErrorHandler.class);
 
     private boolean _showStacks = true;
@@ -86,53 +86,44 @@ public class ErrorHandler extends AbstractHandler
 
             if (error_page != null && context != null)
             {
-                String old_error_page = (String)request.getAttribute(ERROR_PAGE);
-                if (old_error_page == null || !old_error_page.equals(error_page))
+                Dispatcher dispatcher = (Dispatcher)context.getRequestDispatcher(error_page);
+                if (dispatcher != null)
                 {
-                    request.setAttribute(ERROR_PAGE, error_page);
-                    Dispatcher dispatcher = (Dispatcher)context.getRequestDispatcher(error_page);
-                    if (dispatcher != null)
+                    try
                     {
-                        try
-                        {
-                            dispatcher.error(request, response);
-                            complete(request);
-                            return;
-                        }
-                        catch (ServletException x)
-                        {
-                            throw new IOException(x);
-                        }
+                        dispatcher.error(request, response);
+                        return;
                     }
-                    else
+                    catch (ServletException x)
                     {
-                        LOG.warn("Could not dispatch to error page: {}", error_page);
-                        // Fall through to provide the default error page.
+                        throw new IOException(x);
                     }
+                }
+                else
+                {
+                    LOG.warn("Could not dispatch to error page: {}", error_page);
+                    // Fall through to provide the default error page.
                 }
             }
         }
 
         baseRequest.setHandled(true);
-        response.setContentType(MimeTypes.Type.TEXT_HTML_8859_1.asString());
-        String cacheHeader = getCacheControl();
-        if (cacheHeader != null)
-            response.setHeader(HttpHeader.CACHE_CONTROL.asString(), cacheHeader);
-        ByteArrayISO8859Writer writer = new ByteArrayISO8859Writer(4096);
-        String reason = (response instanceof Response) ? ((Response)response).getReason() : null;
-        handleErrorPage(request, writer, response.getStatus(), reason);
-        writer.flush();
-        response.setContentLength(writer.size());
-        writer.writeTo(response.getOutputStream());
-        writer.destroy();
-
-        complete(request);
-    }
-
-    private void complete(HttpServletRequest request)
-    {
-        if (request.isAsyncStarted())
-            request.getAsyncContext().complete();
+        
+        HttpOutput out = baseRequest.getResponse().getHttpOutput();
+        if (!out.isAsync())
+        {
+            response.setContentType(MimeTypes.Type.TEXT_HTML_8859_1.asString());
+            String cacheHeader = getCacheControl();
+            if (cacheHeader != null)
+                response.setHeader(HttpHeader.CACHE_CONTROL.asString(), cacheHeader);
+            ByteArrayISO8859Writer writer = new ByteArrayISO8859Writer(4096);
+            String reason = (response instanceof Response) ? ((Response)response).getReason() : null;
+            handleErrorPage(request, writer, response.getStatus(), reason);
+            writer.flush();
+            response.setContentLength(writer.size());
+            writer.writeTo(response.getOutputStream());
+            writer.destroy();
+        }
     }
 
     /* ------------------------------------------------------------ */
