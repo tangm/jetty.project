@@ -35,6 +35,7 @@ import org.eclipse.jetty.websocket.api.BatchMode;
 import org.eclipse.jetty.websocket.api.RemoteEndpoint;
 import org.eclipse.jetty.websocket.api.Session;
 import org.eclipse.jetty.websocket.api.UpgradeRequest;
+import org.eclipse.jetty.websocket.api.annotations.WebSocket;
 import org.eclipse.jetty.websocket.common.WebSocketSession;
 import org.eclipse.jetty.websocket.common.frames.TextFrame;
 import org.eclipse.jetty.websocket.common.io.FutureWriteCallback;
@@ -292,6 +293,12 @@ public class WebSocketClientTest
         }
     }
 
+    /**
+     * Ensure that <code>@WebSocket(maxTextMessageSize = 100*1024)</code> behaves as expected.
+     * 
+     * @throws Exception
+     *             on test failure
+     */
     @Test
     public void testMaxMessageSize() throws Exception
     {

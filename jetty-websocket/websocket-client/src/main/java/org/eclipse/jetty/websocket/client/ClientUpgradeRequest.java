@@ -86,6 +86,7 @@ public class ClientUpgradeRequest extends UpgradeRequest
     {
         this(wsRequest.getURI());
         // cookies
+        this.setCookies(wsRequest.getCookies());
         // headers
         Map<String, List<String>> headers = new HashMap<>();
         HttpFields fields = wsRequest.getHeaders();

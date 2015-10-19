@@ -53,7 +53,6 @@ import org.eclipse.jetty.websocket.api.extensions.ExtensionFactory;
 import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
 import org.eclipse.jetty.websocket.client.io.UpgradeListener;
-import org.eclipse.jetty.websocket.common.SessionFactory;
 import org.eclipse.jetty.websocket.common.SessionListener;
 import org.eclipse.jetty.websocket.common.WebSocketSession;
 import org.eclipse.jetty.websocket.common.scopes.SimpleContainerScope;
@@ -83,13 +82,13 @@ public class ClientContainer extends ContainerLifeCycle implements WebSocketCont
     private final DecoderFactory decoderFactory;
     /** Tracking all primitive encoders for the container */
     private final EncoderFactory encoderFactory;
+    /** The jetty websocket client in use for this container */
+    private final WebSocketClient client;
 
     /** Tracking for all declared Client endpoints */
     private final Map<Class<?>, EndpointMetadata> endpointClientMetadataCache;
     /** Tracking for all open Sessions */
     private Set<Session> openSessions = new CopyOnWriteArraySet<>();
-    /** The jetty websocket client in use for this container */
-    private WebSocketClient client;
 
     public ClientContainer()
     {
@@ -104,8 +103,8 @@ public class ClientContainer extends ContainerLifeCycle implements WebSocketCont
         
         this.scopeDelegate = scope;
         client = new WebSocketClient(scope, 
-                new JsrEventDriverFactory(client.getPolicy()),
-                new JsrSessionFactory(this,this,client));
+                new JsrEventDriverFactory(scope.getPolicy()),
+                new JsrSessionFactory(this,this,scope));
         addBean(client);
 
         this.endpointClientMetadataCache = new ConcurrentHashMap<>();

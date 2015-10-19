@@ -53,7 +53,6 @@ import org.eclipse.jetty.websocket.common.SessionFactory;
 import org.eclipse.jetty.websocket.common.SessionListener;
 import org.eclipse.jetty.websocket.common.WebSocketSession;
 import org.eclipse.jetty.websocket.common.WebSocketSessionFactory;
-import org.eclipse.jetty.websocket.common.events.EventDriver;
 import org.eclipse.jetty.websocket.common.events.EventDriverFactory;
 import org.eclipse.jetty.websocket.common.extensions.WebSocketExtensionFactory;
 import org.eclipse.jetty.websocket.common.scopes.WebSocketContainerScope;
@@ -105,55 +104,140 @@ public class WebSocketClient extends ContainerLifeCycle implements SessionListen
         this.sessionFactory = new WebSocketSessionFactory(this);
     }
     
-    // below are old
+    /**
+     * Create a new WebSocketClient
+     * 
+     * @param executor
+     *            the executor to use
+     * @deprecated use {@link #WebSocketClient(HttpClient)} instead
+     */
+    @Deprecated
     public WebSocketClient(Executor executor)
     {
         this(null,executor);
     }
     
+    /**
+     * Create a new WebSocketClient
+     * 
+     * @param bufferPool
+     *            byte buffer pool to use
+     * @deprecated use {@link #WebSocketClient(HttpClient)} instead
+     */
+    @Deprecated
     public WebSocketClient(ByteBufferPool bufferPool)
     {
         this(null,null,bufferPool);
     }
 
+    /**
+     * Create a new WebSocketClient
+     * 
+     * @param sslContextFactory
+     *            ssl context factory to use
+     * @deprecated use {@link #WebSocketClient(HttpClient)} instead
+     */
+    @Deprecated
     public WebSocketClient(SslContextFactory sslContextFactory)
     {
         this(sslContextFactory,null);
     }
 
+    /**
+     * Create a new WebSocketClient
+     * 
+     * @param sslContextFactory
+     *            ssl context factory to use
+     * @param executor
+     *            the executor to use
+     * @deprecated use {@link #WebSocketClient(HttpClient)} instead
+     */
+    @Deprecated
     public WebSocketClient(SslContextFactory sslContextFactory, Executor executor)
     {
         this(sslContextFactory,executor,new MappedByteBufferPool());
     }
     
+    /**
+     * Create WebSocketClient other Container Scope, to allow sharing of
+     * internal features like Executor, ByteBufferPool, SSLContextFactory, etc.
+     * 
+     * @param scope
+     *            the Container Scope
+     */
     public WebSocketClient(WebSocketContainerScope scope)
     {
         this(scope.getSslContextFactory(), scope.getExecutor(), scope.getBufferPool(), scope.getObjectFactory());
     }
     
+    /**
+     * Create WebSocketClient other Container Scope, to allow sharing of
+     * internal features like Executor, ByteBufferPool, SSLContextFactory, etc.
+     * 
+     * @param scope
+     *            the Container Scope
+     * @param sslContextFactory
+     *            SSL ContextFactory to use in preference to one from
+     *            {@link WebSocketContainerScope#getSslContextFactory()}
+     */
     public WebSocketClient(WebSocketContainerScope scope, SslContextFactory sslContextFactory)
     {
         this(sslContextFactory, scope.getExecutor(), scope.getBufferPool(), scope.getObjectFactory());
     }
 
+    /**
+     * Create WebSocketClient using sharing instances of SSLContextFactory
+     * Executor, and ByteBufferPool
+     * 
+     * @param sslContextFactory
+     *            shared SSL ContextFactory
+     * @param executor
+     *            shared Executor
+     * @param bufferPool
+     *            shared ByteBufferPool
+     */
     public WebSocketClient(SslContextFactory sslContextFactory, Executor executor, ByteBufferPool bufferPool)
     {
         this(sslContextFactory, executor, bufferPool, new DecoratedObjectFactory());
     }
 
+    /**
+     * Create WebSocketClient using sharing instances of SSLContextFactory
+     * Executor, and ByteBufferPool
+     * 
+     * @param sslContextFactory
+     *            shared SSL ContextFactory
+     * @param executor
+     *            shared Executor
+     * @param bufferPool
+     *            shared ByteBufferPool
+     * @param objectFactory
+     *            shared DecoratedObjectFactory
+     */
     public WebSocketClient(SslContextFactory sslContextFactory, Executor executor, ByteBufferPool bufferPool, DecoratedObjectFactory objectFactory)
     {
         this.httpClient = new HttpClient(sslContextFactory);
         this.httpClient.setExecutor(executor);
-        
+
         this.objectFactory = objectFactory;
         this.extensionRegistry = new WebSocketExtensionFactory(this);
-        
+
         this.masker = new RandomMasker();
         this.eventDriverFactory = new EventDriverFactory(policy);
         this.sessionFactory = new WebSocketSessionFactory(this);
     }
     
+    /**
+     * Create WebSocketClient based on pre-existing Container Scope, to allow sharing of
+     * internal features like Executor, ByteBufferPool, SSLContextFactory, etc.
+     * 
+     * @param scope
+     *            the Container Scope
+     * @param eventDriverFactory
+     *            the EventDriver Factory to use
+     * @param sessionFactory
+     *            the SessionFactory to use
+     */
     public WebSocketClient(WebSocketContainerScope scope, EventDriverFactory eventDriverFactory, SessionFactory sessionFactory)
     {
         this.httpClient = new HttpClient(scope.getSslContextFactory());

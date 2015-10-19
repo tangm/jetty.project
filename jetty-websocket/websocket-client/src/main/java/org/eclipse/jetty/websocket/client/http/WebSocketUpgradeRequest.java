@@ -18,6 +18,7 @@
 
 package org.eclipse.jetty.websocket.client.http;
 
+import java.net.HttpCookie;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -82,8 +83,12 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
         this.extensions = new ArrayList<>(request.getExtensions());
         this.subProtocols = new ArrayList<>(request.getSubProtocols());
         this.localEndpoint = request.getLocalEndpoint();
-        if(StringUtil.isNotBlank(request.getOrigin()))
+        if (StringUtil.isNotBlank(request.getOrigin()))
             this.header(HttpHeader.ORIGIN,request.getOrigin());
+        for (HttpCookie cookie : request.getCookies())
+        {
+            this.cookie(cookie);
+        }
     }
 
     public WebSocketUpgradeRequest(WebSocketClient wsClient, HttpClient httpClient, URI uri)
@@ -289,11 +294,12 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
         // We can upgrade
         EndPoint endp = conn.getEndPoint();
 
-        WebSocketClientConnection connection = new WebSocketClientConnection(wsClient,endp);
+        EventDriver websocket = getEventDriverFactory().wrap(getLocalEndpoint());
+
+        WebSocketClientConnection connection = new WebSocketClientConnection(wsClient,endp,websocket.getPolicy());
 
         URI requestURI = this.getURI();
 
-        EventDriver websocket = getEventDriverFactory().wrap(getLocalEndpoint());
         WebSocketSession session = getSessionFactory().createSession(requestURI,websocket,connection);
         session.setUpgradeRequest(new ClientUpgradeRequest(this));
         session.setUpgradeResponse(new ClientUpgradeResponse(response));

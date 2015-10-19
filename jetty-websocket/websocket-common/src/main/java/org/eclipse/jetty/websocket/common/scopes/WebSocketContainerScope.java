@@ -24,11 +24,12 @@ import org.eclipse.jetty.io.ByteBufferPool;
 import org.eclipse.jetty.util.DecoratedObjectFactory;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.websocket.api.WebSocketPolicy;
+import org.eclipse.jetty.websocket.common.SessionListener;
 
 /**
  * Defined Scope for a WebSocketContainer.
  */
-public interface WebSocketContainerScope
+public interface WebSocketContainerScope extends SessionListener
 {
     /**
      * The configured Container Buffer Pool.

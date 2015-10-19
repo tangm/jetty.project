@@ -27,6 +27,7 @@ import org.eclipse.jetty.util.component.ContainerLifeCycle;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.eclipse.jetty.websocket.api.WebSocketPolicy;
+import org.eclipse.jetty.websocket.common.WebSocketSession;
 
 public class SimpleContainerScope extends ContainerLifeCycle implements WebSocketContainerScope
 {
@@ -104,5 +105,17 @@ public class SimpleContainerScope extends ContainerLifeCycle implements WebSocke
     public void setSslContextFactory(SslContextFactory sslContextFactory)
     {
         this.sslContextFactory = sslContextFactory;
+    }
+
+    @Override
+    public void onSessionOpened(WebSocketSession session)
+    {
+        /* do nothing */
+    }
+
+    @Override
+    public void onSessionClosed(WebSocketSession session)
+    {
+        /* do nothing */
     }
 }

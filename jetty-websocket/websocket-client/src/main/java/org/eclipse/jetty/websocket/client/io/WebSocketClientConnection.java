@@ -22,6 +22,7 @@ import java.net.InetSocketAddress;
 
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.websocket.api.BatchMode;
+import org.eclipse.jetty.websocket.api.WebSocketPolicy;
 import org.eclipse.jetty.websocket.api.WriteCallback;
 import org.eclipse.jetty.websocket.api.extensions.Frame;
 import org.eclipse.jetty.websocket.api.extensions.IncomingFrames;
@@ -38,9 +39,9 @@ public class WebSocketClientConnection extends AbstractWebSocketConnection
 {
     private final Masker masker;
 
-    public WebSocketClientConnection(WebSocketClient client, EndPoint endp)
+    public WebSocketClientConnection(WebSocketClient client, EndPoint endp, WebSocketPolicy websocketPolicy)
     {
-        super(endp,client.getExecutor(),client.getScheduler(),client.getPolicy(),client.getBufferPool());
+        super(endp,client.getExecutor(),client.getScheduler(),websocketPolicy,client.getBufferPool());
         this.masker = new RandomMasker();
     }
 

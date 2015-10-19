@@ -125,7 +125,7 @@ public class CookieTest
         String serverCookies = confirmClientUpgradeAndCookies(clientSocket,clientConnectFuture,serverConn);
 
         assertThat("Cookies seen at server side",serverCookies,containsString("hello=world"));
-        assertThat("Cookies seen at server side",serverCookies,containsString("foo=\"bar is the word\""));
+        assertThat("Cookies seen at server side",serverCookies,containsString("foo=bar is the word"));
     }
     
     @Test
@@ -149,7 +149,7 @@ public class CookieTest
         // client confirms upgrade and receipt of frame
         String serverCookies = confirmClientUpgradeAndCookies(clientSocket,clientConnectFuture,serverConn);
 
-        Assert.assertThat("Cookies seen at server side",serverCookies,containsString("hello=\"world\""));
+        Assert.assertThat("Cookies seen at server side",serverCookies,containsString("hello=world"));
     }
 
     private String confirmClientUpgradeAndCookies(CookieTrackingSocket clientSocket, Future<Session> clientConnectFuture, IBlockheadServerConnection serverConn)
