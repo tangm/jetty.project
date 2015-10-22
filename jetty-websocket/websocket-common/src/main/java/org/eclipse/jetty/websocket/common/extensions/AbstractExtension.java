@@ -69,10 +69,16 @@ public abstract class AbstractExtension extends ContainerLifeCycle implements Ex
         out.append(bean.toString());
     }
     
+    @Deprecated
     public void init(WebSocketContainerScope container)
     {
-        this.policy = container.getPolicy();
-        this.bufferPool = container.getBufferPool();
+        init(container.getPolicy(),container.getBufferPool());
+    }
+    
+    public void init(WebSocketPolicy policy, ByteBufferPool bufferPool)
+    {
+        this.policy = policy;
+        this.bufferPool = bufferPool;
     }
 
     public ByteBufferPool getBufferPool()

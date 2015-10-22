@@ -33,6 +33,7 @@ import java.util.concurrent.Future;
 
 import javax.websocket.ClientEndpoint;
 import javax.websocket.ClientEndpointConfig;
+import javax.websocket.ContainerProvider;
 import javax.websocket.DeploymentException;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
@@ -90,6 +91,9 @@ public class ClientContainer extends ContainerLifeCycle implements WebSocketCont
     /** Tracking for all open Sessions */
     private Set<Session> openSessions = new CopyOnWriteArraySet<>();
 
+    /**
+     * This is the entry point for {@link ContainerProvider#getWebSocketContainer()}
+     */
     public ClientContainer()
     {
         // This constructor is used with Standalone JSR Client usage.
@@ -97,12 +101,17 @@ public class ClientContainer extends ContainerLifeCycle implements WebSocketCont
         client.setDaemon(true);
     }
     
+    /**
+     * This is the entry point for ServerContainer, via ServletContext.getAttribute(ServerContainer.class.getName())
+     * 
+     * @param scope the scope of the ServerContainer
+     */
     public ClientContainer(WebSocketContainerScope scope)
     {
         boolean trustAll = Boolean.getBoolean("org.eclipse.jetty.websocket.jsr356.ssl-trust-all");
         
         this.scopeDelegate = scope;
-        client = new WebSocketClient(scope, 
+        client = new WebSocketClient(scope,
                 new JsrEventDriverFactory(scope.getPolicy()),
                 new JsrSessionFactory(this,this,scope));
         addBean(client);

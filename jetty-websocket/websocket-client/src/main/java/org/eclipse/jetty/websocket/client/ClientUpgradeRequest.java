@@ -39,7 +39,6 @@ import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.UrlEncoded;
 import org.eclipse.jetty.websocket.api.UpgradeRequest;
 import org.eclipse.jetty.websocket.api.extensions.ExtensionConfig;
-import org.eclipse.jetty.websocket.client.http.WebSocketUpgradeRequest;
 
 /**
  * Allowing a generate from a UpgradeRequest

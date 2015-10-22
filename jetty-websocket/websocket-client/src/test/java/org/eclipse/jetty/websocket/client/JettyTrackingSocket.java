@@ -20,6 +20,8 @@ package org.eclipse.jetty.websocket.client;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.Assert.assertThat;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Exchanger;
@@ -128,6 +130,7 @@ public class JettyTrackingSocket extends WebSocketAdapter
     public void onWebSocketConnect(Session session)
     {
         super.onWebSocketConnect(session);
+        assertThat("Session", session, notNullValue());
         connectUpgradeRequest = session.getUpgradeRequest();
         connectUpgradeResponse = session.getUpgradeResponse();
         openLatch.countDown();

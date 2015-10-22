@@ -16,7 +16,7 @@
 //  ========================================================================
 //
 
-package org.eclipse.jetty.websocket.client.http;
+package org.eclipse.jetty.websocket.client;
 
 import java.net.HttpCookie;
 import java.net.URI;
@@ -33,6 +33,7 @@ import org.eclipse.jetty.client.HttpRequest;
 import org.eclipse.jetty.client.HttpResponse;
 import org.eclipse.jetty.client.HttpResponseException;
 import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.api.Response;
 import org.eclipse.jetty.client.api.Response.CompleteListener;
 import org.eclipse.jetty.client.api.Result;
 import org.eclipse.jetty.client.http.HttpConnectionOverHTTP;
@@ -40,6 +41,7 @@ import org.eclipse.jetty.client.http.HttpConnectionUpgrader;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.http.HttpStatus;
 import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.util.B64Code;
@@ -48,19 +50,14 @@ import org.eclipse.jetty.util.StringUtil;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.websocket.api.Session;
-import org.eclipse.jetty.websocket.api.WebSocketPolicy;
+import org.eclipse.jetty.websocket.api.UpgradeException;
 import org.eclipse.jetty.websocket.api.extensions.ExtensionConfig;
 import org.eclipse.jetty.websocket.api.extensions.ExtensionFactory;
-import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
-import org.eclipse.jetty.websocket.client.ClientUpgradeResponse;
-import org.eclipse.jetty.websocket.client.NoOpEndpoint;
-import org.eclipse.jetty.websocket.client.WebSocketClient;
 import org.eclipse.jetty.websocket.client.io.WebSocketClientConnection;
 import org.eclipse.jetty.websocket.common.AcceptHash;
 import org.eclipse.jetty.websocket.common.SessionFactory;
 import org.eclipse.jetty.websocket.common.WebSocketSession;
 import org.eclipse.jetty.websocket.common.events.EventDriver;
-import org.eclipse.jetty.websocket.common.events.EventDriverFactory;
 import org.eclipse.jetty.websocket.common.extensions.ExtensionStack;
 
 public class WebSocketUpgradeRequest extends HttpRequest implements CompleteListener, HttpConnectionUpgrader
@@ -68,21 +65,37 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
     private static final Logger LOG = Log.getLogger(WebSocketUpgradeRequest.class);
 
     private final WebSocketClient wsClient;
-    private final HttpClient httpClient;
+    private final EventDriver localEndpoint;
     private final CompletableFuture<Session> fut;
-    private final int port;
     private List<ExtensionConfig> extensions;
     private List<String> subProtocols;
-    private Object localEndpoint;
 
-    public WebSocketUpgradeRequest(WebSocketClient wsClient, HttpClient httpClient, ClientUpgradeRequest request)
+    private static WebSocketClient getManagedWebSocketClient(HttpClient httpClient)
     {
-        this(wsClient,httpClient,request.getRequestURI());
+        WebSocketClient client = httpClient.getBean(WebSocketClient.class);
+        if (client == null)
+        {
+            client = new WebSocketClient(httpClient);
+            httpClient.addManaged(client);
+        }
+        return client;
+    }
 
-        // Copy values into place
+    /**
+     * Exists for internal use of HttpClient by WebSocketClient.
+     * <p>
+     * Maintained for Backward compatibility and also for JSR356 WebSocket ClientContainer use.
+     * 
+     * @param httpClient the HttpClient that this request uses
+     * @param request the ClientUpgradeRequest (backward compat) to base this request from
+     */
+    protected WebSocketUpgradeRequest(HttpClient httpClient, ClientUpgradeRequest request)
+    {
+        this(httpClient, request.getRequestURI(), request.getLocalEndpoint());
+        
+        // Copy values from ClientUpgradeRequest into place
         this.extensions = new ArrayList<>(request.getExtensions());
         this.subProtocols = new ArrayList<>(request.getSubProtocols());
-        this.localEndpoint = request.getLocalEndpoint();
         if (StringUtil.isNotBlank(request.getOrigin()))
             this.header(HttpHeader.ORIGIN,request.getOrigin());
         for (HttpCookie cookie : request.getCookies())
@@ -91,16 +104,36 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
         }
     }
 
-    public WebSocketUpgradeRequest(WebSocketClient wsClient, HttpClient httpClient, URI uri)
+    /**
+     * Initiating a WebSocket Upgrade using HTTP/1.1
+     * 
+     * @param httpClient the HttpClient that this request uses
+     * @param localEndpoint the local endpoint (following Jetty WebSocket Client API rules) to use for incoming WebSocket events 
+     * @param wsURI the WebSocket URI to connect to
+     */
+    public WebSocketUpgradeRequest(HttpClient httpClient, URI wsURI, Object localEndpoint)
     {
-        super(httpClient,new HttpConversation(),uri);
+        super(httpClient,new HttpConversation(),wsURI);
+        
+        if (!wsURI.isAbsolute())
+        {
+            throw new IllegalArgumentException("WebSocket URI must be an absolute URI: " + wsURI);
+        }
+        
+        String scheme = wsURI.getScheme();
+        if(scheme == null || !(scheme.equalsIgnoreCase("ws") || scheme.equalsIgnoreCase("wss")))
+        {
+            throw new IllegalArgumentException("WebSocket URI must use 'ws' or 'wss' scheme: " + wsURI);
+        }
+        
+        // WebSocketClient(HttpClient) -> WebSocketUpgradeRequest(HttpClient, WebSocketClient) 
+        
+        this.wsClient = getManagedWebSocketClient(httpClient);
+        this.localEndpoint = this.wsClient.getEventDriverFactory().wrap(localEndpoint);
+        
         this.fut = new CompletableFuture<Session>();
-        this.httpClient = httpClient;
-        this.wsClient = wsClient;
         this.extensions = new ArrayList<>();
         this.subProtocols = new ArrayList<>();
-
-        this.port = normalizePort(uri);
     }
 
     private final String genRandomKey()
@@ -110,14 +143,9 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
         return new String(B64Code.encode(bytes));
     }
 
-    private EventDriverFactory getEventDriverFactory()
-    {
-        return wsClient.getEventDriverFactory();
-    }
-
     private ExtensionFactory getExtensionFactory()
     {
-        return wsClient.getExtensionFactory();
+        return this.wsClient.getExtensionFactory();
     }
 
     public List<ExtensionConfig> getExtensions()
@@ -125,34 +153,14 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
         return extensions;
     }
 
-    public Object getLocalEndpoint()
-    {
-        if (localEndpoint == null)
-        {
-            return new NoOpEndpoint();
-        }
-        return localEndpoint;
-    }
-
-    @Override
-    public int getPort()
-    {
-        return port;
-    }
-
     private SessionFactory getSessionFactory()
     {
-        return wsClient.getSessionFactory();
+        return this.wsClient.getSessionFactory();
     }
 
     public List<String> getSubProtocols()
     {
         return subProtocols;
-    }
-
-    private WebSocketPolicy getWebSocketPolicy()
-    {
-        return wsClient.getPolicy();
     }
 
     private void initWebSocketHeaders()
@@ -194,24 +202,19 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
         }
     }
 
-    private int normalizePort(URI uri)
-    {
-        if (uri.getPort() >= 1)
-        {
-            return uri.getPort();
-        }
-
-        if (uri.getScheme().equalsIgnoreCase("wss"))
-        {
-            return 443;
-        }
-
-        return 80;
-    }
-
     @Override
     public void onComplete(Result result)
     {
+        if (LOG.isDebugEnabled())
+        {
+            LOG.debug("onComplete() - {}",result);
+        }
+        
+        URI requestURI = result.getRequest().getURI();
+        Response response = result.getResponse();
+        int responseStatusCode = response.getStatus();
+        String responseLine = responseStatusCode + " " + response.getReason();
+
         if (result.isFailed())
         {
             if(result.getFailure()!=null)
@@ -220,8 +223,32 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
                 LOG.warn("Request Failure", result.getRequestFailure());
             if(result.getResponseFailure()!=null)
                 LOG.warn("Response Failure", result.getResponseFailure());
-            fut.completeExceptionally(result.getFailure());
+            
+            Throwable failure = result.getFailure();
+            if ((failure instanceof java.net.ConnectException) || 
+                (failure instanceof UpgradeException))
+            {
+                // handle as-is
+                handleException(failure);
+            }
+            else
+            {
+                // wrap in UpgradeException 
+                handleException(new UpgradeException(requestURI,responseStatusCode,responseLine,failure));
+            }
         }
+        
+        if(responseStatusCode != HttpStatus.SWITCHING_PROTOCOLS_101)
+        {
+            // Failed to upgrade (other reason)
+            handleException(new UpgradeException(requestURI,responseStatusCode,responseLine));
+        }
+    }
+
+    private void handleException(Throwable failure)
+    {
+        localEndpoint.incomingError(failure);
+        fut.completeExceptionally(failure);
     }
 
     @Override
@@ -234,20 +261,6 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
     public void send(final CompleteListener listener)
     {
         initWebSocketHeaders();
-
-        /*
-        Origin origin = new Origin(getScheme(), getHost(), getPort());
-
-        HttpDestination dest = new HttpDestination(httpClient, origin)
-        {
-            @Override
-            public void send()
-            {
-                TODO: send(WebSocketUpgradeRequest.this, listeners);
-            }
-        };
-        */
-
         super.send(listener);
     }
 
@@ -257,23 +270,20 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
         return fut;
     }
 
-    public void setExtensions(List<ExtensionConfig> extensions)
+    public WebSocketUpgradeRequest setExtensions(List<ExtensionConfig> extensions)
     {
         this.extensions = extensions;
+        return this;
     }
 
-    public void setLocalEndpoint(Object localEndpoint)
-    {
-        this.localEndpoint = localEndpoint;
-    }
-
-    public void setSubProtocols(List<String> subprotocols)
+    public WebSocketUpgradeRequest setSubProtocols(List<String> subprotocols)
     {
         this.subProtocols = subprotocols;
+        return this;
     }
 
     @Override
-    public void upgrade(HttpResponse response, HttpConnectionOverHTTP conn)
+    public void upgrade(HttpResponse response, HttpConnectionOverHTTP oldConn)
     {
         if (!this.getHeaders().get(HttpHeader.UPGRADE).equalsIgnoreCase("websocket"))
         {
@@ -292,15 +302,18 @@ public class WebSocketUpgradeRequest extends HttpRequest implements CompleteList
         }
 
         // We can upgrade
-        EndPoint endp = conn.getEndPoint();
+        EndPoint endp = oldConn.getEndPoint();
 
-        EventDriver websocket = getEventDriverFactory().wrap(getLocalEndpoint());
-
-        WebSocketClientConnection connection = new WebSocketClientConnection(wsClient,endp,websocket.getPolicy());
+        WebSocketClientConnection connection = new WebSocketClientConnection(
+                endp,
+                wsClient.getExecutor(),
+                wsClient.getScheduler(),
+                localEndpoint.getPolicy(),
+                wsClient.getBufferPool());
 
         URI requestURI = this.getURI();
 
-        WebSocketSession session = getSessionFactory().createSession(requestURI,websocket,connection);
+        WebSocketSession session = getSessionFactory().createSession(requestURI,localEndpoint,connection);
         session.setUpgradeRequest(new ClientUpgradeRequest(this));
         session.setUpgradeResponse(new ClientUpgradeResponse(response));
         connection.addListener(session);
