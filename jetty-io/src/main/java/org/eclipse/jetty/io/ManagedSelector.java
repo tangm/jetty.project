@@ -137,10 +137,10 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
     }
 
     /**
-     * A {@link SelectableEndPoint} is an {@link EndPoint} that wish to be
+     * A {@link Selectable} is an {@link EndPoint} that wish to be
      * notified of non-blocking events by the {@link ManagedSelector}.
      */
-    public interface SelectableEndPoint extends EndPoint
+    public interface Selectable 
     {
         /**
          * Callback method invoked when a read or write events has been
@@ -266,10 +266,10 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
                     Object attachment = key.attachment();
                     try
                     {
-                        if (attachment instanceof SelectableEndPoint)
+                        if (attachment instanceof Selectable)
                         {
                             // Try to produce a task
-                            Runnable task = ((SelectableEndPoint)attachment).onSelected();
+                            Runnable task = ((Selectable)attachment).onSelected();
                             if (task != null)
                                 return task;
                         }
@@ -323,8 +323,8 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         private void updateKey(SelectionKey key)
         {
             Object attachment = key.attachment();
-            if (attachment instanceof SelectableEndPoint)
-                ((SelectableEndPoint)attachment).updateKey();
+            if (attachment instanceof Selectable)
+                ((Selectable)attachment).updateKey();
         }
     }
 
@@ -417,7 +417,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         return endPoint;
     }
 
-    public void destroyEndPoint(final EndPoint endPoint)
+    public void onClose(final EndPoint endPoint)
     {
         final Connection connection = endPoint.getConnection();
         submit(new Product()

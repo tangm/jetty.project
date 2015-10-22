@@ -463,7 +463,7 @@ public class RequestTest
         int i=0;
         assertThat(response, Matchers.containsString("200 OK"));
         assertEquals("http://myhost/",results.get(i++));
-        assertEquals("0.0.0.0",results.get(i++));
+        assertEquals("",results.get(i++));
         assertEquals("myhost",results.get(i++));
         assertEquals("80",results.get(i++));
 
@@ -477,7 +477,7 @@ public class RequestTest
         i=0;
         assertThat(response, Matchers.containsString("200 OK"));
         assertEquals("http://myhost:8888/",results.get(i++));
-        assertEquals("0.0.0.0",results.get(i++));
+        assertEquals("",results.get(i++));
         assertEquals("myhost",results.get(i++));
         assertEquals("8888",results.get(i++));
         
@@ -489,7 +489,7 @@ public class RequestTest
         i=0;
         assertThat(response, Matchers.containsString("200 OK"));
         assertEquals("http://myhost:8888/",results.get(i++));
-        assertEquals("0.0.0.0",results.get(i++));
+        assertEquals("",results.get(i++));
         assertEquals("myhost",results.get(i++));
         assertEquals("8888",results.get(i++));
         
@@ -502,7 +502,7 @@ public class RequestTest
         i=0;
         assertThat(response, Matchers.containsString("200 OK"));
         assertEquals("http://myhost:8888/",results.get(i++));
-        assertEquals("0.0.0.0",results.get(i++));
+        assertEquals("",results.get(i++));
         assertEquals("myhost",results.get(i++));
         assertEquals("8888",results.get(i++));
 
@@ -517,7 +517,7 @@ public class RequestTest
 
         assertThat(response, Matchers.containsString("200 OK"));
         assertEquals("http://1.2.3.4/",results.get(i++));
-        assertEquals("0.0.0.0",results.get(i++));
+        assertEquals("",results.get(i++));
         assertEquals("1.2.3.4",results.get(i++));
         assertEquals("80",results.get(i++));
 
@@ -531,7 +531,7 @@ public class RequestTest
         i=0;
         assertThat(response, Matchers.containsString("200 OK"));
         assertEquals("http://1.2.3.4:8888/",results.get(i++));
-        assertEquals("0.0.0.0",results.get(i++));
+        assertEquals("",results.get(i++));
         assertEquals("1.2.3.4",results.get(i++));
         assertEquals("8888",results.get(i++));
 
@@ -545,7 +545,7 @@ public class RequestTest
         i=0;
         assertThat(response, Matchers.containsString("200 OK"));
         assertEquals("http://[::1]/",results.get(i++));
-        assertEquals("0.0.0.0",results.get(i++));
+        assertEquals("",results.get(i++));
         assertEquals("[::1]",results.get(i++));
         assertEquals("80",results.get(i++));
 
@@ -559,7 +559,7 @@ public class RequestTest
         i=0;
         assertThat(response, Matchers.containsString("200 OK"));
         assertEquals("http://[::1]:8888/",results.get(i++));
-        assertEquals("0.0.0.0",results.get(i++));
+        assertEquals("",results.get(i++));
         assertEquals("[::1]",results.get(i++));
         assertEquals("8888",results.get(i++));
 

@@ -54,10 +54,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.client.ssl.SslBytesTest.TLSRecord.Type;
 import org.eclipse.jetty.http.HttpParser;
+import org.eclipse.jetty.io.ChannelEndPoint;
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.io.ManagedSelector;
-import org.eclipse.jetty.io.SelectChannelEndPoint;
 import org.eclipse.jetty.io.ssl.SslConnection;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpConnection;
@@ -173,9 +173,9 @@ public class SslBytesServerTest extends SslBytesTest
         ServerConnector connector = new ServerConnector(server, null,null,null,1,1,sslFactory, httpFactory)
         {
             @Override
-            protected SelectChannelEndPoint newEndPoint(SocketChannel channel, ManagedSelector selectSet, SelectionKey key) throws IOException
+            protected ChannelEndPoint newEndPoint(SocketChannel channel, ManagedSelector selectSet, SelectionKey key) throws IOException
             {
-                SelectChannelEndPoint endp = super.newEndPoint(channel,selectSet,key);
+                ChannelEndPoint endp = super.newEndPoint(channel,selectSet,key);
                 serverEndPoint.set(endp);
                 return endp;
             }

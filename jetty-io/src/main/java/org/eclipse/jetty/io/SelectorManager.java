@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.nio.channels.ByteChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -362,7 +363,7 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
      * @throws IOException if the endPoint cannot be created
      * @see #newConnection(SocketChannel, EndPoint, Object)
      */
-    protected abstract EndPoint newEndPoint(SocketChannel channel, ManagedSelector selector, SelectionKey selectionKey) throws IOException;
+    protected abstract EndPoint newEndPoint(ByteChannel channel, ManagedSelector selector, SelectionKey selectionKey) throws IOException;
 
     /**
      * <p>Factory method to create {@link Connection}.</p>
@@ -374,7 +375,7 @@ public abstract class SelectorManager extends AbstractLifeCycle implements Dumpa
      * @throws IOException if unable to create new connection
      * @see #newEndPoint(SocketChannel, ManagedSelector, SelectionKey)
      */
-    public abstract Connection newConnection(SocketChannel channel, EndPoint endpoint, Object attachment) throws IOException;
+    public abstract Connection newConnection(ByteChannel channel, EndPoint endpoint, Object attachment) throws IOException;
 
     @Override
     public String dump()

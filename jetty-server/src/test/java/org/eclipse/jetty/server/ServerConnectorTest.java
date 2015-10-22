@@ -35,6 +35,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.eclipse.jetty.io.ChannelEndPoint;
 import org.eclipse.jetty.io.EndPoint;
+import org.eclipse.jetty.io.SocketChannelEndPoint;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.DefaultHandler;
 import org.eclipse.jetty.server.handler.HandlerList;
@@ -61,8 +62,8 @@ public class ServerConnectorTest
             response.setContentType("text/plain");
 
             EndPoint endPoint = baseRequest.getHttpChannel().getEndPoint();
-            assertThat("Endpoint",endPoint,instanceOf(ChannelEndPoint.class));
-            ChannelEndPoint channelEndPoint = (ChannelEndPoint)endPoint;
+            assertThat("Endpoint",endPoint,instanceOf(SocketChannelEndPoint.class));
+            SocketChannelEndPoint channelEndPoint = (SocketChannelEndPoint)endPoint;
             Socket socket = channelEndPoint.getSocket();
             ServerConnector connector = (ServerConnector)baseRequest.getHttpChannel().getConnector();
 

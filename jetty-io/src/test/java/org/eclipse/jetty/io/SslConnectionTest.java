@@ -86,9 +86,9 @@ public class SslConnectionTest
         }
 
         @Override
-        protected SelectChannelEndPoint newEndPoint(SocketChannel channel, ManagedSelector selectSet, SelectionKey selectionKey) throws IOException
+        protected ChannelEndPoint newEndPoint(SocketChannel channel, ManagedSelector selectSet, SelectionKey selectionKey) throws IOException
         {
-            SelectChannelEndPoint endp = new TestEP(channel,selectSet, selectionKey, getScheduler(), 60000);
+            ChannelEndPoint endp = new TestEP(channel,selectSet, selectionKey, getScheduler(), 60000);
             _lastEndp=endp;
             return endp;
         }
