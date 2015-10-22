@@ -24,6 +24,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.channels.Channel;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -493,19 +494,19 @@ public class ServerConnector extends AbstractNetworkConnector
         }
 
         @Override
-        protected void accepted(SocketChannel channel) throws IOException
+        protected void accepted(SelectableChannel channel) throws IOException
         {
-            ServerConnector.this.accepted(channel);
+            ServerConnector.this.accepted((SocketChannel)channel);
         }
 
         @Override
-        protected ChannelEndPoint newEndPoint(SocketChannel channel, ManagedSelector selectSet, SelectionKey selectionKey) throws IOException
+        protected ChannelEndPoint newEndPoint(SelectableChannel channel, ManagedSelector selectSet, SelectionKey selectionKey) throws IOException
         {
-            return ServerConnector.this.newEndPoint(channel, selectSet, selectionKey);
+            return ServerConnector.this.newEndPoint((SocketChannel)channel, selectSet, selectionKey);
         }
 
         @Override
-        public Connection newConnection(SocketChannel channel, EndPoint endpoint, Object attachment) throws IOException
+        public Connection newConnection(SelectableChannel channel, EndPoint endpoint, Object attachment) throws IOException
         {
             return getDefaultConnectionFactory().newConnection(ServerConnector.this, endpoint);
         }

@@ -2,14 +2,10 @@ package org.eclipse.jetty.unixsocket;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SelectionKey;
 
-import org.eclipse.jetty.io.AbstractEndPoint;
 import org.eclipse.jetty.io.ChannelEndPoint;
 import org.eclipse.jetty.io.ManagedSelector;
-import org.eclipse.jetty.util.BufferUtil;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.thread.Scheduler;

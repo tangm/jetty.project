@@ -23,10 +23,9 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.nio.channels.CancelledKeyException;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -77,12 +76,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
     protected void doStart() throws Exception
     {
         super.doStart();
-        _selector = newSelector();
-    }
-
-    protected Selector newSelector() throws IOException
-    {
-        return Selector.open();
+        _selector = _selectorManager.newSelector();
     }
 
     public int size()
@@ -334,11 +328,11 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
 
     private Runnable processConnect(SelectionKey key, final Connect connect)
     {
-        SocketChannel channel = (SocketChannel)key.channel();
+        SelectableChannel channel = (SelectableChannel)key.channel();
         try
         {
             key.attach(connect.attachment);
-            boolean connected = _selectorManager.finishConnect(channel);
+            boolean connected = _selectorManager.doFinishConnect(channel);
             if (LOG.isDebugEnabled())
                 LOG.debug("Connected {} {}", connected, channel);
             if (connected)
@@ -375,11 +369,11 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
 
     private void processAccept(SelectionKey key)
     {
-        ServerSocketChannel server = (ServerSocketChannel)key.channel();
-        SocketChannel channel = null;
+        SelectableChannel server = key.channel();
+        SelectableChannel channel = null;
         try
         {
-            while ((channel = server.accept()) != null)
+            while ((channel = _selectorManager.doAccept(server)) != null)
             {
                 _selectorManager.accepted(channel);
             }
@@ -404,7 +398,7 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         }
     }
 
-    private EndPoint createEndPoint(SocketChannel channel, SelectionKey selectionKey) throws IOException
+    private EndPoint createEndPoint(SelectableChannel channel, SelectionKey selectionKey) throws IOException
     {
         EndPoint endPoint = _selectorManager.newEndPoint(channel, this, selectionKey);
         _selectorManager.endPointOpened(endPoint);
@@ -517,9 +511,9 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
 
     class Acceptor implements Runnable
     {
-        private final ServerSocketChannel _channel;
+        private final SelectableChannel _channel;
 
-        public Acceptor(ServerSocketChannel channel)
+        public Acceptor(SelectableChannel channel)
         {
             this._channel = channel;
         }
@@ -543,10 +537,10 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
 
     class Accept implements Runnable
     {
-        private final SocketChannel channel;
+        private final SelectableChannel channel;
         private final Object attachment;
 
-        Accept(SocketChannel channel, Object attachment)
+        Accept(SelectableChannel channel, Object attachment)
         {
             this.channel = channel;
             this.attachment = attachment;
@@ -570,10 +564,10 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
 
     private class CreateEndPoint implements Product
     {
-        private final SocketChannel channel;
+        private final SelectableChannel channel;
         private final SelectionKey key;
 
-        public CreateEndPoint(SocketChannel channel, SelectionKey key)
+        public CreateEndPoint(SelectableChannel channel, SelectionKey key)
         {
             this.channel = channel;
             this.key = key;
@@ -603,11 +597,11 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
     class Connect implements Runnable
     {
         private final AtomicBoolean failed = new AtomicBoolean();
-        private final SocketChannel channel;
+        private final SelectableChannel channel;
         private final Object attachment;
         private final Scheduler.Task timeout;
 
-        Connect(SocketChannel channel, Object attachment)
+        Connect(SelectableChannel channel, Object attachment)
         {
             this.channel = channel;
             this.attachment = attachment;
@@ -650,8 +644,8 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         @Override
         public void run()
         {
-            SocketChannel channel = connect.channel;
-            if (channel.isConnectionPending())
+            SelectableChannel channel = connect.channel;
+            if (_selectorManager.isConnectionPending(channel))
             {
                 if (LOG.isDebugEnabled())
                     LOG.debug("Channel {} timed out while connecting, closing it", channel);

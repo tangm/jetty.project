@@ -19,7 +19,6 @@
 package org.eclipse.jetty.server;
 
 import static javax.servlet.RequestDispatcher.ERROR_EXCEPTION;
-import static javax.servlet.RequestDispatcher.ERROR_MESSAGE;
 import static javax.servlet.RequestDispatcher.ERROR_STATUS_CODE;
 
 import java.io.IOException;
@@ -31,8 +30,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.servlet.DispatcherType;
-import javax.servlet.RequestDispatcher;
-import javax.servlet.UnavailableException;
 
 import org.eclipse.jetty.http.BadMessageException;
 import org.eclipse.jetty.http.HttpFields;

@@ -1,6 +1,5 @@
 package org.eclipse.jetty.unixsocket;
 
-import jnr.enxio.channels.NativeSelectorProvider;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -9,6 +8,8 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import jnr.enxio.channels.NativeSelectorProvider;
 import jnr.unixsocket.UnixServerSocket;
 import jnr.unixsocket.UnixServerSocketChannel;
 import jnr.unixsocket.UnixSocketAddress;
@@ -19,7 +20,7 @@ public class UnixServer
 
     public static void main(String[] args) throws IOException
     {
-        java.io.File path = new java.io.File("/tmp/fubar.sock");
+        java.io.File path = new java.io.File("/tmp/jetty.sock");
         path.deleteOnExit();
         UnixSocketAddress address = new UnixSocketAddress(path);
         UnixServerSocketChannel channel = UnixServerSocketChannel.open();

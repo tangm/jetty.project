@@ -19,7 +19,6 @@
 package org.eclipse.jetty.io;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.Map;
 
 import org.eclipse.jetty.util.log.Log;

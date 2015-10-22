@@ -9,12 +9,12 @@ import java.util.Date;
 import jnr.unixsocket.UnixSocketAddress;
 import jnr.unixsocket.UnixSocketChannel;
 
-public class UnixClient
+public class UnixSocketClient
 {
     public static void main(String[] args) throws Exception
     {
         java.io.File path = new java.io.File("/tmp/jetty.sock");
-        String data = "blah blah "+new Date();
+        String data = "GET / HTTP/1.1\r\nHost: unixsock\r\n\r\n";
         UnixSocketAddress address = new UnixSocketAddress(path);
         UnixSocketChannel channel = UnixSocketChannel.open(address);
         System.out.println("connected to " + channel.getRemoteSocketAddress());
@@ -27,20 +27,12 @@ public class UnixClient
             w.print(data);
             w.flush();
 
-            CharBuffer result = CharBuffer.allocate(1024);
+            CharBuffer result = CharBuffer.allocate(4096);
             r.read(result);
             result.flip();
             System.out.println("read from server: " + result.toString());
-            if (!result.toString().equals(data))
-            {
-                System.out.println("ERROR: data mismatch");
-            }
-            else
-            {
-                System.out.println("SUCCESS");
-            }
             
-            Thread.sleep(10000);
+            Thread.sleep(1000);
         }
     }
 }

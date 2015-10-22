@@ -28,6 +28,7 @@ import org.eclipse.jetty.util.thread.Scheduler;
 /**
  * An ChannelEndpoint that can be scheduled by {@link SelectorManager}.
  */
+@Deprecated
 public class SelectChannelEndPoint extends SocketChannelEndPoint implements ManagedSelector.Selectable
 {
     public static final Logger LOG = Log.getLogger(SelectChannelEndPoint.class);

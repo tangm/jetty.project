@@ -3,7 +3,7 @@ package org.eclipse.jetty.io;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.channels.ByteChannel;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
@@ -17,6 +17,11 @@ public class SocketChannelEndPoint extends ChannelEndPoint
     private final Socket _socket;
     private final InetSocketAddress _local;
     private final InetSocketAddress _remote;
+
+    public SocketChannelEndPoint(SelectableChannel channel, ManagedSelector selector, SelectionKey key, Scheduler scheduler)
+    {
+        this((SocketChannel)channel,selector,key,scheduler);
+    }
     
     public SocketChannelEndPoint(SocketChannel channel, ManagedSelector selector, SelectionKey key, Scheduler scheduler)
     {

@@ -18,39 +18,39 @@
 
 package org.eclipse.jetty.unixsocket;
 
+import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.SocketException;
-import java.nio.channels.Channel;
+import java.net.SocketAddress;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 
 import org.eclipse.jetty.io.ByteBufferPool;
-import org.eclipse.jetty.io.ChannelEndPoint;
 import org.eclipse.jetty.io.Connection;
 import org.eclipse.jetty.io.EndPoint;
 import org.eclipse.jetty.io.ManagedSelector;
-import org.eclipse.jetty.io.SelectChannelEndPoint;
 import org.eclipse.jetty.io.SelectorManager;
 import org.eclipse.jetty.server.AbstractConnectionFactory;
 import org.eclipse.jetty.server.AbstractConnector;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.util.Callback;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.annotation.ManagedAttribute;
 import org.eclipse.jetty.util.annotation.ManagedObject;
 import org.eclipse.jetty.util.annotation.Name;
+import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.log.Logger;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.Scheduler;
 
+import jnr.enxio.channels.NativeSelectorProvider;
 import jnr.unixsocket.UnixServerSocketChannel;
+import jnr.unixsocket.UnixSocketAddress;
+import jnr.unixsocket.UnixSocketChannel;
 
 /**
  *
@@ -58,6 +58,8 @@ import jnr.unixsocket.UnixServerSocketChannel;
 @ManagedObject("HTTP connector using NIO ByteChannels and Selectors")
 public class UnixSocketConnector extends AbstractConnector
 {
+    private static final Logger LOG = Log.getLogger(UnixSocketConnector.class);
+    
     private final SelectorManager _manager;
     private final String _file = "/tmp/jetty.sock";
     private volatile UnixServerSocketChannel _acceptChannel;
@@ -212,19 +214,27 @@ public class UnixSocketConnector extends AbstractConnector
 
     protected SelectorManager newSelectorManager(Executor executor, Scheduler scheduler, int selectors)
     {
-        return new ServerConnectorManager(executor, scheduler, selectors);
+        return new UnixSocketConnectorManager(executor, scheduler, selectors);
     }
 
     @Override
     protected void doStart() throws Exception
     {
+        open();
         super.doStart();
-
+        
         if (getAcceptors()==0)
         {
             _acceptChannel.configureBlocking(false);
             _manager.acceptor(_acceptChannel);
         }
+    }
+    
+    @Override
+    protected void doStop() throws Exception
+    {
+        super.doStop();
+        close();
     }
 
     public boolean isOpen()
@@ -233,38 +243,18 @@ public class UnixSocketConnector extends AbstractConnector
         return channel!=null && channel.isOpen();
     }
 
+    
     public void open() throws IOException
     {
         if (_acceptChannel == null)
         {
-            ServerSocketChannel serverChannel = null;
-            if (isInheritChannel())
-            {
-                Channel channel = System.inheritedChannel();
-                if (channel instanceof ServerSocketChannel)
-                    serverChannel = (ServerSocketChannel)channel;
-                else
-                    LOG.warn("Unable to use System.inheritedChannel() [{}]. Trying a new ServerSocketChannel at {}:{}", channel, getHost(), getPort());
-            }
-
-            if (serverChannel == null)
-            {
-                serverChannel = ServerSocketChannel.open();
-
-                InetSocketAddress bindAddress = getHost() == null ? new InetSocketAddress(getPort()) : new InetSocketAddress(getHost(), getPort());
-                serverChannel.socket().setReuseAddress(getReuseAddress());
-                serverChannel.socket().bind(bindAddress, getAcceptQueueSize());
-
-                _localPort = serverChannel.socket().getLocalPort();
-                if (_localPort <= 0)
-                    throw new IOException("Server channel not bound");
-
-                addBean(serverChannel);
-            }
-
+            UnixServerSocketChannel serverChannel = UnixServerSocketChannel.open();
+            SocketAddress bindAddress = new UnixSocketAddress(new File(_file));
+            serverChannel.socket().bind(bindAddress, getAcceptQueueSize());
             serverChannel.configureBlocking(true);
             addBean(serverChannel);
 
+            LOG.debug("opened {}",serverChannel);
             _acceptChannel = serverChannel;
         }
     }
@@ -276,10 +266,9 @@ public class UnixSocketConnector extends AbstractConnector
         return super.shutdown();
     }
 
-    @Override
     public void close()
     {
-        ServerSocketChannel serverChannel = _acceptChannel;
+        UnixServerSocketChannel serverChannel = _acceptChannel;
         _acceptChannel = null;
 
         if (serverChannel != null)
@@ -298,44 +287,28 @@ public class UnixSocketConnector extends AbstractConnector
                     LOG.warn(e);
                 }
             }
+
+            new File(_file).delete();
         }
-        // super.close();
-        _localPort = -2;
     }
 
     @Override
     public void accept(int acceptorID) throws IOException
     {
-        ServerSocketChannel serverChannel = _acceptChannel;
+        UnixServerSocketChannel serverChannel = _acceptChannel;
         if (serverChannel != null && serverChannel.isOpen())
         {
-            SocketChannel channel = serverChannel.accept();
+            LOG.debug("accept {}",serverChannel);
+            UnixSocketChannel channel = serverChannel.accept();
+            LOG.debug("accepted {}",channel);
             accepted(channel);
         }
     }
     
-    private void accepted(SocketChannel channel) throws IOException
+    protected void accepted(UnixSocketChannel channel) throws IOException
     {
-        channel.configureBlocking(false);
-        Socket socket = channel.socket();
-        configure(socket);
+        channel.configureBlocking(false); 
         _manager.accept(channel);
-    }
-
-    protected void configure(Socket socket)
-    {
-        try
-        {
-            socket.setTcpNoDelay(true);
-            if (_lingerTime >= 0)
-                socket.setSoLinger(true, _lingerTime / 1000);
-            else
-                socket.setSoLinger(false, 0);
-        }
-        catch (SocketException e)
-        {
-            LOG.ignore(e);
-        }
     }
 
     public SelectorManager getSelectorManager()
@@ -349,10 +322,9 @@ public class UnixSocketConnector extends AbstractConnector
         return _acceptChannel;
     }
 
-
-    protected ChannelEndPoint newEndPoint(SocketChannel channel, ManagedSelector selectSet, SelectionKey key) throws IOException
+    protected UnixSocketEndPoint newEndPoint(SelectableChannel channel, ManagedSelector selector, SelectionKey key) throws IOException
     {
-        return new SelectChannelEndPoint(channel, selectSet, key, getScheduler(), getIdleTimeout());
+        return new UnixSocketEndPoint((UnixSocketChannel)channel,selector,key,getScheduler());
     }
 
 
@@ -391,27 +363,44 @@ public class UnixSocketConnector extends AbstractConnector
         _reuseAddress = reuseAddress;
     }
 
-    protected class ServerConnectorManager extends SelectorManager
+
+    @Override
+    public String toString()
     {
-        public ServerConnectorManager(Executor executor, Scheduler scheduler, int selectors)
+        return String.format("%s{%s}",
+                super.toString(),
+                _file);
+    }
+    
+    protected class UnixSocketConnectorManager extends SelectorManager
+    {
+        public UnixSocketConnectorManager(Executor executor, Scheduler scheduler, int selectors)
         {
             super(executor, scheduler, selectors);
         }
 
         @Override
-        protected void accepted(SocketChannel channel) throws IOException
+        protected void accepted(SelectableChannel channel) throws IOException
         {
-            UnixSocketConnector.this.accepted(channel);
+            UnixSocketConnector.this.accepted((UnixSocketChannel)channel);
         }
 
         @Override
-        protected ChannelEndPoint newEndPoint(SocketChannel channel, ManagedSelector selectSet, SelectionKey selectionKey) throws IOException
+        protected Selector newSelector() throws IOException
         {
-            return UnixSocketConnector.this.newEndPoint(channel, selectSet, selectionKey);
+            return NativeSelectorProvider.getInstance().openSelector();
+        }
+        
+        @Override
+        protected EndPoint newEndPoint(SelectableChannel channel, ManagedSelector selector, SelectionKey selectionKey) throws IOException
+        {
+            UnixSocketEndPoint endp = UnixSocketConnector.this.newEndPoint(channel, selector, selectionKey);
+            endp.setIdleTimeout(getIdleTimeout());
+            return endp;
         }
 
         @Override
-        public Connection newConnection(SocketChannel channel, EndPoint endpoint, Object attachment) throws IOException
+        public Connection newConnection(SelectableChannel channel, EndPoint endpoint, Object attachment) throws IOException
         {
             return getDefaultConnectionFactory().newConnection(UnixSocketConnector.this, endpoint);
         }
@@ -428,6 +417,27 @@ public class UnixSocketConnector extends AbstractConnector
         {
             onEndPointClosed(endpoint);
             super.endPointClosed(endpoint);
+        }
+
+        @Override
+        protected boolean doFinishConnect(SelectableChannel channel) throws IOException
+        {
+            return ((UnixSocketChannel)channel).finishConnect();
+        }
+
+        @Override
+        protected boolean isConnectionPending(SelectableChannel channel)
+        {
+            return ((UnixSocketChannel)channel).isConnectionPending();
+        }
+
+        @Override
+        protected SelectableChannel doAccept(SelectableChannel server) throws IOException
+        {
+            LOG.debug("doAccept {}",server);
+            UnixSocketChannel channel = ((UnixServerSocketChannel)server).accept();
+            LOG.debug("accepted {}",channel);
+            return channel;
         }
     }
 }
