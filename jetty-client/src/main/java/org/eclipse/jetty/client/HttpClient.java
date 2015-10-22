@@ -18,7 +18,6 @@
 
 package org.eclipse.jetty.client;
 
-import java.io.IOException;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
 import java.net.CookieStore;
@@ -498,24 +497,18 @@ public class HttpClient extends ContainerLifeCycle
         if (destination == null)
         {
             destination = transport.newHttpDestination(origin);
-            if (isRunning())
+            addManaged(destination);
+            HttpDestination existing = destinations.putIfAbsent(origin, destination);
+            if (existing != null)
             {
-                HttpDestination existing = destinations.putIfAbsent(origin, destination);
-                if (existing != null)
-                {
-                    destination = existing;
-                }
-                else
-                {
-                    addManaged(destination);
-                    if (LOG.isDebugEnabled())
-                        LOG.debug("Created {}", destination);
-                }
-
-                if (!isRunning())
-                    removeDestination(destination);
+                removeBean(destination);
+                destination = existing;
             }
-
+            else
+            {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("Created {}", destination);
+            }
         }
         return destination;
     }
@@ -1058,13 +1051,6 @@ public class HttpClient extends ContainerLifeCycle
             return port == 443;
         else 
             return port == 80;
-    }
-
-    @Override
-    public void dump(Appendable out, String indent) throws IOException
-    {
-        dumpThis(out);
-        dump(out, indent, getBeans(), destinations.values());
     }
 
     private class ContentDecoderFactorySet implements Set<ContentDecoder.Factory>
