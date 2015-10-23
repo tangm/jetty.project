@@ -27,6 +27,11 @@ maven://com.github.jnr/jnr-posix/3.0.12|lib/jnr/jnr-posix-3.0.12.jar
 lib/jetty-unixsocket-${jetty.version}.jar
 lib/jnr/*.jar
 
+[license]
+Jetty UnixSockets is implmented using the Java Native Runtime, which is an 
+open source project hosted on Github and released under the Apache 2.0 license.
+https://github.com/jnr/jnr-unixsocket
+http://www.apache.org/licenses/LICENSE-2.0.html
 
 [ini-template]
 ### HTTP Connector Configuration
