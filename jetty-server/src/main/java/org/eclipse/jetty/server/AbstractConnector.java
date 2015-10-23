@@ -298,7 +298,7 @@ public abstract class AbstractConnector extends ContainerLifeCycle implements Co
         // If we have a stop timeout
         long stopTimeout = getStopTimeout();
         CountDownLatch stopping=_stopping;
-        if (stopTimeout > 0 && stopping!=null)
+        if (stopTimeout > 0 && stopping!=null && getAcceptors()>0)
             stopping.await(stopTimeout,TimeUnit.MILLISECONDS);
         _stopping=null;
 

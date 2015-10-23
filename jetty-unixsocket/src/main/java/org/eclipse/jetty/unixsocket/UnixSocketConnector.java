@@ -61,7 +61,7 @@ public class UnixSocketConnector extends AbstractConnector
     private static final Logger LOG = Log.getLogger(UnixSocketConnector.class);
     
     private final SelectorManager _manager;
-    private final String _file = "/tmp/jetty.sock";
+    private String _unixSocket = "/tmp/jetty.sock";
     private volatile UnixServerSocketChannel _acceptChannel;
     private volatile int _acceptQueueSize = 0;
     private volatile boolean _reuseAddress = true;
@@ -205,11 +205,22 @@ public class UnixSocketConnector extends AbstractConnector
         @Name("selectors") int selectors,
         @Name("factories") ConnectionFactory... factories)
     {
-        super(server,executor,scheduler,bufferPool,acceptors,factories);
+        super(server,executor,scheduler,bufferPool,0,factories);
         _manager = newSelectorManager(getExecutor(), getScheduler(),
             selectors>0?selectors:Math.max(1,Math.min(4,Runtime.getRuntime().availableProcessors()/2)));
         addBean(_manager, true);
         setAcceptorPriorityDelta(-2);
+    }
+
+    @ManagedAttribute
+    public String getUnixSocket()
+    {
+        return _unixSocket;
+    }
+    
+    public void setUnixSocket(String filename)
+    {
+        _unixSocket=filename;
     }
 
     protected SelectorManager newSelectorManager(Executor executor, Scheduler scheduler, int selectors)
@@ -224,10 +235,7 @@ public class UnixSocketConnector extends AbstractConnector
         super.doStart();
         
         if (getAcceptors()==0)
-        {
-            _acceptChannel.configureBlocking(false);
             _manager.acceptor(_acceptChannel);
-        }
     }
     
     @Override
@@ -249,9 +257,9 @@ public class UnixSocketConnector extends AbstractConnector
         if (_acceptChannel == null)
         {
             UnixServerSocketChannel serverChannel = UnixServerSocketChannel.open();
-            SocketAddress bindAddress = new UnixSocketAddress(new File(_file));
+            SocketAddress bindAddress = new UnixSocketAddress(new File(_unixSocket));
             serverChannel.socket().bind(bindAddress, getAcceptQueueSize());
-            serverChannel.configureBlocking(true);
+            serverChannel.configureBlocking(getAcceptors()>0);
             addBean(serverChannel);
 
             LOG.debug("opened {}",serverChannel);
@@ -288,7 +296,7 @@ public class UnixSocketConnector extends AbstractConnector
                 }
             }
 
-            new File(_file).delete();
+            new File(_unixSocket).delete();
         }
     }
 
@@ -369,7 +377,7 @@ public class UnixSocketConnector extends AbstractConnector
     {
         return String.format("%s{%s}",
                 super.toString(),
-                _file);
+                _unixSocket);
     }
     
     protected class UnixSocketConnectorManager extends SelectorManager
