@@ -46,7 +46,7 @@ public class UnixSocketServer
             {
                 baseRequest.setHandled(true);
                 response.setStatus(200);
-                response.getWriter().write("Hello World");
+                response.getWriter().write("Hello World\r\n");
             }
             
         });

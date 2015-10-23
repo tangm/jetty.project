@@ -258,6 +258,8 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
                 if (key.isValid())
                 {
                     Object attachment = key.attachment();
+                    if (LOG.isDebugEnabled())
+                        LOG.debug("selected {} {} ",key,attachment);
                     try
                     {
                         if (attachment instanceof Selectable)
@@ -373,10 +375,9 @@ public class ManagedSelector extends AbstractLifeCycle implements Runnable, Dump
         SelectableChannel channel = null;
         try
         {
-            while ((channel = _selectorManager.doAccept(server)) != null)
-            {
+            channel = _selectorManager.doAccept(server);
+            if (channel!=null)
                 _selectorManager.accepted(channel);
-            }
         }
         catch (Throwable x)
         {

@@ -74,45 +74,37 @@ public class UnixSocketConnector extends AbstractConnector
      */
     public UnixSocketConnector( @Name("server") Server server)
     {
-        this(server,null,null,null,-1,-1,new HttpConnectionFactory());
+        this(server,null,null,null,-1,new HttpConnectionFactory());
     }
     
     /* ------------------------------------------------------------ */
     /** HTTP Server Connection.
      * <p>Construct a ServerConnector with a private instance of {@link HttpConnectionFactory} as the only factory.</p>
      * @param server The {@link Server} this connector will accept connection for. 
-     * @param acceptors 
-     *          the number of acceptor threads to use, or -1 for a default value. Acceptors accept new TCP/IP connections.  If 0, then 
-     *          the selector threads are used to accept connections.
      * @param selectors
      *          the number of selector threads, or &lt;=0 for a default value. Selectors notice and schedule established connection that can make IO progress.
      */
     public UnixSocketConnector(
         @Name("server") Server server,
-        @Name("acceptors") int acceptors,
         @Name("selectors") int selectors)
     {
-        this(server,null,null,null,acceptors,selectors,new HttpConnectionFactory());
+        this(server,null,null,null,selectors,new HttpConnectionFactory());
     }
     
     /* ------------------------------------------------------------ */
     /** HTTP Server Connection.
      * <p>Construct a ServerConnector with a private instance of {@link HttpConnectionFactory} as the only factory.</p>
      * @param server The {@link Server} this connector will accept connection for. 
-     * @param acceptors 
-     *          the number of acceptor threads to use, or -1 for a default value. Acceptors accept new TCP/IP connections.  If 0, then 
-     *          the selector threads are used to accept connections.
      * @param selectors
      *          the number of selector threads, or &lt;=0 for a default value. Selectors notice and schedule established connection that can make IO progress.
      * @param factories Zero or more {@link ConnectionFactory} instances used to create and configure connections.
      */
     public UnixSocketConnector(
         @Name("server") Server server,
-        @Name("acceptors") int acceptors,
         @Name("selectors") int selectors,
         @Name("factories") ConnectionFactory... factories)
     {
-        this(server,null,null,null,acceptors,selectors,factories);
+        this(server,null,null,null,selectors,factories);
     }
 
     /* ------------------------------------------------------------ */
@@ -125,7 +117,7 @@ public class UnixSocketConnector extends AbstractConnector
         @Name("server") Server server,
         @Name("factories") ConnectionFactory... factories)
     {
-        this(server,null,null,null,-1,-1,factories);
+        this(server,null,null,null,-1,factories);
     }
 
     /* ------------------------------------------------------------ */
@@ -139,7 +131,7 @@ public class UnixSocketConnector extends AbstractConnector
         @Name("server") Server server,
         @Name("sslContextFactory") SslContextFactory sslContextFactory)
     {
-        this(server,null,null,null,-1,-1,AbstractConnectionFactory.getFactories(sslContextFactory,new HttpConnectionFactory()));
+        this(server,null,null,null,-1,AbstractConnectionFactory.getFactories(sslContextFactory,new HttpConnectionFactory()));
     }
 
     /* ------------------------------------------------------------ */
@@ -148,19 +140,15 @@ public class UnixSocketConnector extends AbstractConnector
      * @param server The {@link Server} this connector will accept connection for. 
      * @param sslContextFactory If non null, then a {@link SslConnectionFactory} is instantiated and prepended to the 
      * list of HTTP Connection Factory.
-     * @param acceptors 
-     *          the number of acceptor threads to use, or -1 for a default value. Acceptors accept new TCP/IP connections.  If 0, then 
-     *          the selector threads are used to accept connections.
      * @param selectors
      *          the number of selector threads, or &lt;=0 for a default value. Selectors notice and schedule established connection that can make IO progress.
      */
     public UnixSocketConnector(
         @Name("server") Server server,
-        @Name("acceptors") int acceptors,
         @Name("selectors") int selectors,
         @Name("sslContextFactory") SslContextFactory sslContextFactory)
     {
-        this(server,null,null,null,acceptors,selectors,AbstractConnectionFactory.getFactories(sslContextFactory,new HttpConnectionFactory()));
+        this(server,null,null,null,selectors,AbstractConnectionFactory.getFactories(sslContextFactory,new HttpConnectionFactory()));
     }
 
     /* ------------------------------------------------------------ */
@@ -175,7 +163,7 @@ public class UnixSocketConnector extends AbstractConnector
         @Name("sslContextFactory") SslContextFactory sslContextFactory,
         @Name("factories") ConnectionFactory... factories)
     {
-        this(server, null, null, null, -1, -1, AbstractConnectionFactory.getFactories(sslContextFactory, factories));
+        this(server, null, null, null, -1, AbstractConnectionFactory.getFactories(sslContextFactory, factories));
     }
 
     /** Generic Server Connection.
@@ -188,11 +176,8 @@ public class UnixSocketConnector extends AbstractConnector
      *          A scheduler used to schedule timeouts. If null then use the servers scheduler
      * @param bufferPool
      *          A ByteBuffer pool used to allocate buffers.  If null then create a private pool with default configuration.
-     * @param acceptors 
-     *          the number of acceptor threads to use, or -1 for a default value. Acceptors accept new TCP/IP connections.  If 0, then 
-     *          the selector threads are used to accept connections.
      * @param selectors
-     *          the number of selector threads, or &lt;=0 for a default value. Selectors notice and schedule established connection that can make IO progress.
+     *          the number of selector threads, or &lt;=0 for a default value(1). Selectors notice and schedule established connection that can make IO progress.
      * @param factories 
      *          Zero or more {@link ConnectionFactory} instances used to create and configure connections.
      */
@@ -201,13 +186,12 @@ public class UnixSocketConnector extends AbstractConnector
         @Name("executor") Executor executor,
         @Name("scheduler") Scheduler scheduler,
         @Name("bufferPool") ByteBufferPool bufferPool,
-        @Name("acceptors") int acceptors,
         @Name("selectors") int selectors,
         @Name("factories") ConnectionFactory... factories)
     {
-        super(server,executor,scheduler,bufferPool,acceptors,factories);
+        super(server,executor,scheduler,bufferPool,0,factories);
         _manager = newSelectorManager(getExecutor(), getScheduler(),
-            selectors>0?selectors:Math.max(1,Math.min(4,Runtime.getRuntime().availableProcessors()/2)));
+            selectors>0?selectors:1);
         addBean(_manager, true);
         setAcceptorPriorityDelta(-2);
     }
@@ -303,6 +287,7 @@ public class UnixSocketConnector extends AbstractConnector
     @Override
     public void accept(int acceptorID) throws IOException
     {
+        LOG.warn("Blocking UnixSocket accept used.  Cannot be interrupted!");
         UnixServerSocketChannel serverChannel = _acceptChannel;
         if (serverChannel != null && serverChannel.isOpen())
         {
@@ -442,9 +427,9 @@ public class UnixSocketConnector extends AbstractConnector
         @Override
         protected SelectableChannel doAccept(SelectableChannel server) throws IOException
         {
-            LOG.debug("doAccept {}",server);
+            LOG.debug("doAccept async {}",server);
             UnixSocketChannel channel = ((UnixServerSocketChannel)server).accept();
-            LOG.debug("accepted {}",channel);
+            LOG.debug("accepted async {}",channel);
             return channel;
         }
     }

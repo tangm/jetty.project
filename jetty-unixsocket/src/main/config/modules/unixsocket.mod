@@ -42,10 +42,7 @@ http://www.apache.org/licenses/LICENSE-2.0.html
 ## Connector idle timeout in milliseconds
 # jetty.unixsocket.idleTimeout=30000
 
-## Number of acceptors (-1 picks default based on number of cores)
-# jetty.unixsocket.acceptors=-1
-
-## Number of selectors (-1 picks default based on number of cores)
+## Number of selectors (-1 picks default 1)
 # jetty.unixsocket.selectors=-1
 
 ## ServerSocketChannel backlog (0 picks platform default)
