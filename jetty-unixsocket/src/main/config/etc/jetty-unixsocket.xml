@@ -10,7 +10,6 @@
     <Arg>
       <New id="unixSocketConnector" class="org.eclipse.jetty.unixsocket.UnixSocketConnector">
         <Arg name="server"><Ref refid="Server" /></Arg>
-        <Arg name="acceptors" type="int"><Property name="jetty.unixsocket.acceptors" default="-1"/></Arg>
         <Arg name="selectors" type="int"><Property name="jetty.unixsocket.selectors" default="-1"/></Arg>
         <Arg name="factories">
           <Array type="org.eclipse.jetty.server.ConnectionFactory">
