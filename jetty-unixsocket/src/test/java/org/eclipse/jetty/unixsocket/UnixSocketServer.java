@@ -24,6 +24,8 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.ProxyConnectionFactory;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.handler.AbstractHandler;
@@ -34,7 +36,9 @@ public class UnixSocketServer
     {
         Server server = new Server();
         
-        UnixSocketConnector connector = new UnixSocketConnector(server);
+        HttpConnectionFactory http = new HttpConnectionFactory();
+        ProxyConnectionFactory proxy = new ProxyConnectionFactory(http.getProtocol());
+        UnixSocketConnector connector = new UnixSocketConnector(server,proxy,http);
         server.addConnector(connector);
         
         server.setHandler(new AbstractHandler()
@@ -47,6 +51,8 @@ public class UnixSocketServer
                 baseRequest.setHandled(true);
                 response.setStatus(200);
                 response.getWriter().write("Hello World\r\n");
+                response.getWriter().write("remote="+request.getRemoteAddr()+":"+request.getRemotePort()+"\r\n");
+                response.getWriter().write("local ="+request.getLocalAddr()+":"+request.getLocalPort()+"\r\n");
             }
             
         });
