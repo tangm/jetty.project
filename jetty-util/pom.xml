@@ -40,6 +40,11 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>net.incongru.watchservice</groupId>
+      <artifactId>barbary-watchservice</artifactId>
+      <version>1.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
       <scope>provided</scope>

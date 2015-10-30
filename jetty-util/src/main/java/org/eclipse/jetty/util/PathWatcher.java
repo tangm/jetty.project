@@ -18,24 +18,19 @@
 
 package org.eclipse.jetty.util;
 
-import static java.nio.file.StandardWatchEventKinds.*;
+import static com.barbarysoftware.watchservice.StandardWatchEventKind.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.ClosedWatchServiceException;
 import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
-import java.nio.file.WatchEvent;
-import java.nio.file.WatchEvent.Kind;
-import java.nio.file.WatchKey;
-import java.nio.file.WatchService;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -51,6 +46,10 @@ import java.util.Scanner;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 
+import com.barbarysoftware.watchservice.WatchEvent;
+import com.barbarysoftware.watchservice.WatchKey;
+import com.barbarysoftware.watchservice.WatchService;
+import com.barbarysoftware.watchservice.WatchableFile;
 import org.eclipse.jetty.util.component.AbstractLifeCycle;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
@@ -609,19 +608,20 @@ public class PathWatcher extends AbstractLifeCycle implements Runnable
 
         }
 
-        public PathWatchEvent(Path path, WatchEvent<Path> event)
+        public PathWatchEvent(Path path, WatchEvent<?> event)
         {
             this.path = path;
             this.count = event.count();
-            if (event.kind() == ENTRY_CREATE)
+            final WatchEvent<WatchableFile> e = (WatchEvent<WatchableFile>)event;
+            if (e.kind() == ENTRY_CREATE)
             {
                 this.type = PathWatchEventType.ADDED;
             }
-            else if (event.kind() == ENTRY_DELETE)
+            else if (e.kind() == ENTRY_DELETE)
             {
                 this.type = PathWatchEventType.DELETED;
             }
-            else if (event.kind() == ENTRY_MODIFY)
+            else if (e.kind() == ENTRY_MODIFY)
             {
                 this.type = PathWatchEventType.MODIFIED;
             }
@@ -863,7 +863,7 @@ public class PathWatcher extends AbstractLifeCycle implements Runnable
 
     private static final WatchEvent.Kind<?> WATCH_EVENT_KINDS[] = { ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY };
     
-    private  WatchService watchService;
+    private WatchService watchService;
     private  WatchEvent.Modifier watchModifiers[];
     private  boolean nativeWatchService;
     
@@ -1073,7 +1073,7 @@ public class PathWatcher extends AbstractLifeCycle implements Runnable
     private void createWatchService () throws IOException
     {
         //create a watch service
-        this.watchService = FileSystems.getDefault().newWatchService();
+        this.watchService = WatchService.newWatchService();
 
         WatchEvent.Modifier modifiers[] = null;
         boolean nativeService = true;
@@ -1188,17 +1188,18 @@ public class PathWatcher extends AbstractLifeCycle implements Runnable
      */
     protected void register(Path dir, Config root) throws IOException
     {
-       
+
         LOG.debug("Registering watch on {}",dir);
-        if(watchModifiers != null) 
+        final WatchableFile barbaryDir = new WatchableFile(dir.toFile());
+        if(watchModifiers != null)
         {
             // Java Watcher
-            WatchKey key = dir.register(watchService,WATCH_EVENT_KINDS,watchModifiers);
+            WatchKey key = barbaryDir.register(watchService,WATCH_EVENT_KINDS,watchModifiers);
             keys.put(key,root.asSubConfig(dir));
         } else 
         {
             // Native Watcher
-            WatchKey key = dir.register(watchService,WATCH_EVENT_KINDS);
+            WatchKey key = barbaryDir.register(watchService,WATCH_EVENT_KINDS);
             keys.put(key,root.asSubConfig(dir));
         }
     }
@@ -1324,10 +1325,10 @@ public class PathWatcher extends AbstractLifeCycle implements Runnable
                 for (WatchEvent<?> event : key.pollEvents())
                 {
                     @SuppressWarnings("unchecked")
-                    WatchEvent.Kind<Path> kind = (Kind<Path>)event.kind();
-                    WatchEvent<Path> ev = cast(event);
-                    Path name = ev.context();
-                    Path child = config.dir.resolve(name);
+                    WatchEvent.Kind<WatchableFile> kind = (WatchEvent.Kind<WatchableFile>)event.kind();
+                    WatchEvent<File> ev = cast(event);
+                    File name = ev.context();
+                    Path child = config.dir.resolve(name.toPath());
 
                     if (kind == ENTRY_CREATE)
                     {
