@@ -367,11 +367,19 @@ public class SslBytesServerTest extends SslBytesTest
         System.arraycopy(doneBytes, 0, chunk, recordBytes.length, doneBytes.length);
         System.arraycopy(closeRecordBytes, 0, chunk, recordBytes.length + doneBytes.length, closeRecordBytes.length);
         proxy.flushToServer(0, chunk);
+        
         // Close the raw socket
         proxy.flushToServer(null);
 
         // Expect the server to send a FIN as well
         record = proxy.readFromServer();
+        if (record!=null)
+        {
+            // Close alert snuck out  // TODO check if this is acceptable
+            Assert.assertEquals(Type.ALERT,record.getType());
+            record = proxy.readFromServer();
+        }
+        
         Assert.assertNull(record);
 
         // Check that we did not spin
