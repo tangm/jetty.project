@@ -20,7 +20,10 @@ package org.eclipse.jetty.io;
 
 import java.io.EOFException;
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
@@ -42,6 +45,28 @@ import org.eclipse.jetty.util.thread.Scheduler;
 public class ByteArrayEndPoint extends AbstractEndPoint
 {
     static final Logger LOG = Log.getLogger(ByteArrayEndPoint.class);
+    static final InetAddress  NOIP;
+    static final InetSocketAddress NOIPPORT;
+    
+    static
+    {
+        InetAddress noip=null;
+        try
+        {
+            noip = Inet4Address.getByName("0.0.0.0");
+        }
+        catch (UnknownHostException e)
+        {
+            LOG.warn(e);
+        }
+        finally
+        {
+            NOIP=noip;
+            NOIPPORT=new InetSocketAddress(NOIP,0);
+        }
+    }
+    
+    
     private static final ByteBuffer EOF = BufferUtil.allocate(0);
 
     private final Runnable _runFillable = new Runnable()
@@ -120,14 +145,14 @@ public class ByteArrayEndPoint extends AbstractEndPoint
     @Override
     public InetSocketAddress getLocalAddress()
     {
-        return null;
+        return NOIPPORT;
     }
 
     /* ------------------------------------------------------------ */
     @Override
     public InetSocketAddress getRemoteAddress()
     {
-        return null;
+        return NOIPPORT;
     }
 
     /* ------------------------------------------------------------ */
