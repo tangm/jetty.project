@@ -1,3 +1,11 @@
+Fork description
+============
+This fork replaces the default JDK WatchService with the [https://github.com/gjoseph/barbarywatchservice](BarbaryWatchService)
+as it defaults to Polling on OSX with a minimum of a 5s interval. I just wanted file reloading to happen faster on
+the jetty maven plugin :)
+
+Changes found in the BarbaryWatchService branch
+
 Project description
 ============
 
